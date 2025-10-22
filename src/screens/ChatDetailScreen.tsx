@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import { Message } from '../types';
@@ -98,7 +99,7 @@ export const ChatDetailScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="arrow-back" size={24} color="#2D3436" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'John Doe'}</Text>
@@ -107,7 +108,7 @@ export const ChatDetailScreen: React.FC = () => {
           </Text>
         </View>
         <TouchableOpacity style={styles.moreButton}>
-          <Text style={styles.moreButtonText}>⋮</Text>
+          <Ionicons name="ellipsis-vertical" size={24} color="#2D3436" />
         </TouchableOpacity>
       </View>
 
@@ -123,7 +124,7 @@ export const ChatDetailScreen: React.FC = () => {
 
       <View style={styles.inputContainer}>
         <TouchableOpacity style={styles.attachButton}>
-          <Text style={styles.attachButtonText}>📎</Text>
+          <Ionicons name="attach" size={24} color="#9CA3AF" />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
@@ -135,7 +136,7 @@ export const ChatDetailScreen: React.FC = () => {
           maxLength={500}
         />
         <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-          <Text style={styles.sendButtonText}>📤</Text>
+          <Ionicons name="send" size={20} color="#FF9B9B" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -163,10 +164,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: theme.spacing.sm,
   },
-  backButtonText: {
-    fontSize: 28,
-    color: theme.colors.text.dark,
-  },
   headerInfo: {
     flex: 1,
   },
@@ -184,10 +181,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  moreButtonText: {
-    fontSize: 24,
-    color: theme.colors.text.dark,
   },
   messagesList: {
     padding: theme.spacing.md,
@@ -207,7 +200,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   ownBubble: {
-    backgroundColor: theme.colors.blue.indigo,
+    backgroundColor: '#FF9B9B',
   },
   otherBubble: {
     backgroundColor: theme.colors.white,
@@ -264,9 +257,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: theme.spacing.sm,
   },
-  attachButtonText: {
-    fontSize: 20,
-  },
   input: {
     flex: 1,
     backgroundColor: theme.colors.background.chat,
@@ -283,9 +273,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: theme.spacing.sm,
-  },
-  sendButtonText: {
-    fontSize: 20,
   },
   errorText: {
     fontSize: theme.fontSize.md,

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../components';
 import { theme } from '../theme';
 import { useStore } from '../store';
@@ -86,9 +87,11 @@ export const ChatScreen: React.FC = () => {
       <Card style={styles.chatCard}>
         <View style={styles.chatHeader}>
           <View style={styles.chatIcon}>
-            <Text style={styles.chatEmoji}>
-              {item.type === 'group' ? '🎨' : '👤'}
-            </Text>
+            <Ionicons
+              name={item.type === 'group' ? 'people' : 'person'}
+              size={24}
+              color="#fff"
+            />
           </View>
           <View style={styles.chatInfo}>
             <View style={styles.chatTitleRow}>
@@ -120,9 +123,9 @@ export const ChatScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>💬 Messages</Text>
+        <Text style={styles.headerTitle}>Messages</Text>
         <TouchableOpacity style={styles.searchButton}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={20} color="#2D3436" />
         </TouchableOpacity>
       </View>
 
@@ -162,9 +165,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchIcon: {
-    fontSize: 20,
-  },
   chatList: {
     padding: theme.spacing.lg,
   },
@@ -180,13 +180,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.blue.indigo,
+    backgroundColor: '#FF9B9B',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
-  },
-  chatEmoji: {
-    fontSize: 24,
   },
   chatInfo: {
     flex: 1,
@@ -212,14 +209,14 @@ const styles = StyleSheet.create({
   },
   chatTag: {
     fontSize: theme.fontSize.xs,
-    color: theme.colors.blue.indigo,
+    color: '#FF9B9B',
     fontWeight: theme.fontWeight.semibold,
   },
   unreadBadge: {
     width: 24,
     height: 24,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.blue.indigo,
+    backgroundColor: '#FF9B9B',
     alignItems: 'center',
     justifyContent: 'center',
   },

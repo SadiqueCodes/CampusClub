@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, 
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path, Line, Defs, Pattern, Rect } from 'react-native-svg';
 import { Card } from '../components';
 import { theme } from '../theme';
 import { useStore } from '../store';
@@ -159,17 +160,17 @@ export const HomeScreen: React.FC = () => {
   const getClubGradient = (type: string): [string, string] => {
     switch (type) {
       case 'Arts & Culture':
-        return ['#FF9B9B', '#FFB4B4'];
+        return ['#C86B8A', '#D98CA8'];
       case 'Technology':
-        return ['#6366F1', '#8B5CF6'];
+        return ['#5A6BC8', '#7A8CD8'];
       case 'Sports':
-        return ['#10B981', '#34D399'];
+        return ['#5A8F7B', '#7BAD96'];
       case 'Academic':
-        return ['#F59E0B', '#FBBF24'];
+        return ['#D97B52', '#E89B7A'];
       case 'Social':
-        return ['#EC4899', '#F472B6'];
+        return ['#C86B8A', '#D98CA8'];
       default:
-        return ['#6366F1', '#8B5CF6'];
+        return ['#B06579', '#C67E8E'];
     }
   };
 
@@ -190,59 +191,79 @@ export const HomeScreen: React.FC = () => {
 
   const popularClubs = getPopularClubs();
 
-  const renderClubCard = ({ item }: { item: Club }) => (
-    <TouchableOpacity style={styles.clubCard}>
-      <LinearGradient
-        colors={getClubGradient(item.type)}
-        style={styles.clubCardGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.clubCardInner}>
-          <View style={styles.clubCardContent}>
-            <View style={styles.clubCardHeader}>
-              <View style={styles.clubLogoContainer}>
-                {item.logo ? (
-                  <Image source={{ uri: item.logo }} style={styles.clubLogo} />
-                ) : (
-                  <Ionicons name={getClubIcon(item.type) as any} size={20} color="#fff" />
-                )}
+  const renderClubCard = ({ item }: { item: Club }) => {
+    const [gradientStart, gradientEnd] = getClubGradient(item.type);
+
+    return (
+      <TouchableOpacity style={styles.clubCard}>
+        <LinearGradient
+          colors={[gradientStart, gradientEnd]}
+          style={styles.clubCardGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Pattern Overlay */}
+          <Svg width={280} height={160} style={styles.patternOverlay}>
+            <Defs>
+              <Pattern id={`dots-${item.id}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                <Circle cx="2" cy="2" r="1.5" fill="rgba(255,255,255,0.15)" />
+              </Pattern>
+            </Defs>
+            <Rect width="280" height="160" fill={`url(#dots-${item.id})`} />
+            <Circle cx="240" cy="30" r="60" fill="rgba(255,255,255,0.08)" />
+            <Circle cx="30" cy="130" r="40" fill="rgba(255,255,255,0.08)" />
+          </Svg>
+
+          <View style={styles.clubCardInner}>
+            <View style={styles.clubCardContent}>
+              <View style={styles.clubCardHeader}>
+                <View style={styles.clubLogoContainer}>
+                  {item.logo ? (
+                    <Image source={{ uri: item.logo }} style={styles.clubLogo} />
+                  ) : (
+                    <Ionicons name={getClubIcon(item.type) as any} size={20} color="#fff" />
+                  )}
+                </View>
+                <View style={styles.clubCardBadge}>
+                  <Ionicons name="people" size={10} color="#fff" />
+                  <Text style={styles.clubCardBadgeText}>{item.memberCount}</Text>
+                </View>
               </View>
-              <View style={styles.clubCardBadge}>
-                <Ionicons name="people" size={10} color="#fff" />
-                <Text style={styles.clubCardBadgeText}>{item.memberCount}</Text>
-              </View>
+              <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
+              <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
             </View>
-            <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
-            <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
+            <TouchableOpacity style={styles.applyButton}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.applyButton}>
-            <Text style={styles.applyButtonText}>Apply</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const isClubLeader = currentUser && clubs.some(c => c.leaderId === currentUser.id);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {currentUser?.name || 'Student'}</Text>
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="notifications-outline" size={20} color="#2D3436" />
-          <View style={styles.notificationBadge} />
-        </TouchableOpacity>
-      </View>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#E372A1', '#CE678A', '#B06579']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <Text style={styles.greeting}>
+            Hello, <Text style={styles.userName}>{currentUser?.name || 'Student'}</Text>
+          </Text>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={22} color="#fff" />
+            <View style={styles.notificationBadge} />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Top Clubs Section */}
         <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Popular Clubs</Text>
-     </View>
           {popularClubs.length > 0 ? (
             <FlatList
               horizontal
@@ -281,7 +302,7 @@ export const HomeScreen: React.FC = () => {
               <TouchableOpacity key={event.id} style={styles.eventCard}>
                 <View style={styles.eventIconContainer}>
                   <LinearGradient
-                    colors={['#FF9B9B', '#FFB4B4']}
+                    colors={['#E372A1', '#F48FB1']}
                     style={styles.eventIconGradient}
                   >
                     <Ionicons name="calendar" size={20} color="#fff" />
@@ -305,7 +326,7 @@ export const HomeScreen: React.FC = () => {
                   </View>
                 </View>
                 <View style={styles.interestedBadge}>
-                  <Ionicons name="heart" size={12} color="#FF9B9B" />
+                  <Ionicons name="heart" size={12} color="#E372A1" />
                   <Text style={styles.interestedCount}>{event.interestedCount}</Text>
                 </View>
               </TouchableOpacity>
@@ -356,44 +377,58 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F8F9FA',
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#FAFAFA',
   },
   greeting: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.9)',
   },
   notificationButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FF9B9B',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
   },
   scrollContent: {
     paddingBottom: 100,
   },
   section: {
-    marginTop: 24,
+    marginTop: 16,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -414,9 +449,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1F2937',
+    letterSpacing: 0.5,
   },
   seeAllText: {
     fontSize: 14,
@@ -440,10 +476,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
+    overflow: 'hidden',
+  },
+  patternOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   clubCardInner: {
     flex: 1,
     justifyContent: 'space-between',
+    zIndex: 1,
   },
   clubCardContent: {
     flex: 0,
@@ -517,17 +560,17 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FF9B9B',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E372A1',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF9B9B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#E372A1',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
   },
   emptyState: {
     backgroundColor: '#fff',
@@ -558,12 +601,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   eventIconContainer: {
     marginRight: 12,
@@ -598,17 +641,17 @@ const styles = StyleSheet.create({
   interestedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF1F1',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    height: 24,
+    backgroundColor: '#FFE8F1',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    height: 28,
     gap: 4,
   },
   interestedCount: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#FF9B9B',
+    fontWeight: '700',
+    color: '#E372A1',
     marginLeft: 4,
   },
   marketplaceGrid: {
@@ -620,19 +663,19 @@ const styles = StyleSheet.create({
   marketplaceItem: {
     width: (SCREEN_WIDTH - 64) / 3,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 16,
+    padding: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   itemImagePlaceholder: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -644,9 +687,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FF9B9B',
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#E372A1',
     marginBottom: 4,
   },
   sellerRow: {

@@ -62,30 +62,70 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Pink Gradient Background */}
+      {/* Gradient Background */}
       <LinearGradient
-        colors={['#FFB4B4', '#FF9B9B', '#FF8C8C']}
-        style={styles.gradient}
+colors={['#B06579', '#CE678A', '#E372A1']}   
+     style={styles.gradient}
       >
-        {/* Abstract Pattern Overlay */}
+        {/* Floral & Book Pattern Overlay */}
         <View style={styles.patternContainer}>
           <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT * 0.6} style={styles.pattern}>
+            {/* Flower 1 - Top Left */}
+            <Circle cx={SCREEN_WIDTH * 0.12} cy={SCREEN_HEIGHT * 0.1} r="8" fill="rgba(255,255,255,0.15)" />
+            <Circle cx={SCREEN_WIDTH * 0.12 - 8} cy={SCREEN_HEIGHT * 0.1} r="6" fill="rgba(255,255,255,0.15)" />
+            <Circle cx={SCREEN_WIDTH * 0.12 + 8} cy={SCREEN_HEIGHT * 0.1} r="6" fill="rgba(255,255,255,0.15)" />
+            <Circle cx={SCREEN_WIDTH * 0.12} cy={SCREEN_HEIGHT * 0.1 - 8} r="6" fill="rgba(255,255,255,0.15)" />
+            <Circle cx={SCREEN_WIDTH * 0.12} cy={SCREEN_HEIGHT * 0.1 + 8} r="6" fill="rgba(255,255,255,0.15)" />
+            <Circle cx={SCREEN_WIDTH * 0.12} cy={SCREEN_HEIGHT * 0.1} r="3" fill="rgba(255,255,255,0.3)" />
+
+            {/* Book 1 - Top Right */}
             <Path
-              d={`M0,${SCREEN_HEIGHT * 0.15} Q${SCREEN_WIDTH * 0.25},${SCREEN_HEIGHT * 0.1} ${SCREEN_WIDTH * 0.5},${SCREEN_HEIGHT * 0.15} T${SCREEN_WIDTH},${SCREEN_HEIGHT * 0.15}`}
-              stroke="rgba(255,255,255,0.15)"
-              strokeWidth="2"
-              fill="none"
+              d={`M${SCREEN_WIDTH * 0.8},${SCREEN_HEIGHT * 0.12} L${SCREEN_WIDTH * 0.8 + 25},${SCREEN_HEIGHT * 0.12} L${SCREEN_WIDTH * 0.8 + 25},${SCREEN_HEIGHT * 0.12 + 30} L${SCREEN_WIDTH * 0.8},${SCREEN_HEIGHT * 0.12 + 30} Z`}
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="1.5"
+              fill="rgba(255,255,255,0.08)"
             />
+            <Line x1={SCREEN_WIDTH * 0.8 + 12.5} y1={SCREEN_HEIGHT * 0.12} x2={SCREEN_WIDTH * 0.8 + 12.5} y2={SCREEN_HEIGHT * 0.12 + 30} stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
+
+            {/* Flower 2 - Center */}
+            <Circle cx={SCREEN_WIDTH * 0.5} cy={SCREEN_HEIGHT * 0.22} r="10" fill="rgba(255,255,255,0.12)" />
+            <Circle cx={SCREEN_WIDTH * 0.5 - 10} cy={SCREEN_HEIGHT * 0.22} r="7" fill="rgba(255,255,255,0.12)" />
+            <Circle cx={SCREEN_WIDTH * 0.5 + 10} cy={SCREEN_HEIGHT * 0.22} r="7" fill="rgba(255,255,255,0.12)" />
+            <Circle cx={SCREEN_WIDTH * 0.5} cy={SCREEN_HEIGHT * 0.22 - 10} r="7" fill="rgba(255,255,255,0.12)" />
+            <Circle cx={SCREEN_WIDTH * 0.5} cy={SCREEN_HEIGHT * 0.22 + 10} r="7" fill="rgba(255,255,255,0.12)" />
+            <Circle cx={SCREEN_WIDTH * 0.5} cy={SCREEN_HEIGHT * 0.22} r="4" fill="rgba(255,255,255,0.25)" />
+
+            {/* Leaves - scattered */}
+            <Path d={`M${SCREEN_WIDTH * 0.25},${SCREEN_HEIGHT * 0.18} Q${SCREEN_WIDTH * 0.25 + 5},${SCREEN_HEIGHT * 0.18 - 8} ${SCREEN_WIDTH * 0.25 + 10},${SCREEN_HEIGHT * 0.18}`} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" fill="none" />
+            <Path d={`M${SCREEN_WIDTH * 0.7},${SCREEN_HEIGHT * 0.28} Q${SCREEN_WIDTH * 0.7 + 5},${SCREEN_HEIGHT * 0.28 - 8} ${SCREEN_WIDTH * 0.7 + 10},${SCREEN_HEIGHT * 0.28}`} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" fill="none" />
+
+            {/* Book 2 - Left */}
             <Path
-              d={`M0,${SCREEN_HEIGHT * 0.25} Q${SCREEN_WIDTH * 0.3},${SCREEN_HEIGHT * 0.2} ${SCREEN_WIDTH * 0.6},${SCREEN_HEIGHT * 0.25} T${SCREEN_WIDTH},${SCREEN_HEIGHT * 0.25}`}
+              d={`M${SCREEN_WIDTH * 0.15},${SCREEN_HEIGHT * 0.35} L${SCREEN_WIDTH * 0.15 + 22},${SCREEN_HEIGHT * 0.35} L${SCREEN_WIDTH * 0.15 + 22},${SCREEN_HEIGHT * 0.35 + 28} L${SCREEN_WIDTH * 0.15},${SCREEN_HEIGHT * 0.35 + 28} Z`}
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="1.5"
+              fill="rgba(255,255,255,0.08)"
+            />
+
+            {/* Flower 3 - Right */}
+            <Circle cx={SCREEN_WIDTH * 0.85} cy={SCREEN_HEIGHT * 0.38} r="9" fill="rgba(255,255,255,0.13)" />
+            <Circle cx={SCREEN_WIDTH * 0.85 - 9} cy={SCREEN_HEIGHT * 0.38} r="6" fill="rgba(255,255,255,0.13)" />
+            <Circle cx={SCREEN_WIDTH * 0.85 + 9} cy={SCREEN_HEIGHT * 0.38} r="6" fill="rgba(255,255,255,0.13)" />
+            <Circle cx={SCREEN_WIDTH * 0.85} cy={SCREEN_HEIGHT * 0.38 - 9} r="6" fill="rgba(255,255,255,0.13)" />
+            <Circle cx={SCREEN_WIDTH * 0.85} cy={SCREEN_HEIGHT * 0.38 + 9} r="6" fill="rgba(255,255,255,0.13)" />
+
+            {/* Small decorative elements */}
+            <Circle cx={SCREEN_WIDTH * 0.35} cy={SCREEN_HEIGHT * 0.45} r="3" fill="rgba(255,255,255,0.2)" />
+            <Circle cx={SCREEN_WIDTH * 0.6} cy={SCREEN_HEIGHT * 0.15} r="3" fill="rgba(255,255,255,0.2)" />
+            <Circle cx={SCREEN_WIDTH * 0.9} cy={SCREEN_HEIGHT * 0.25} r="3" fill="rgba(255,255,255,0.2)" />
+
+            {/* Flowing vine */}
+            <Path
+              d={`M0,${SCREEN_HEIGHT * 0.3} Q${SCREEN_WIDTH * 0.2},${SCREEN_HEIGHT * 0.28} ${SCREEN_WIDTH * 0.4},${SCREEN_HEIGHT * 0.32} T${SCREEN_WIDTH * 0.8},${SCREEN_HEIGHT * 0.3}`}
               stroke="rgba(255,255,255,0.1)"
-              strokeWidth="2"
+              strokeWidth="1.5"
               fill="none"
             />
-            <Circle cx={SCREEN_WIDTH * 0.2} cy={SCREEN_HEIGHT * 0.1} r="30" stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
-            <Circle cx={SCREEN_WIDTH * 0.8} cy={SCREEN_HEIGHT * 0.35} r="40" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none" />
-            <Line x1={SCREEN_WIDTH * 0.1} y1={SCREEN_HEIGHT * 0.3} x2={SCREEN_WIDTH * 0.3} y2={SCREEN_HEIGHT * 0.4} stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
-            <Line x1={SCREEN_WIDTH * 0.7} y1={SCREEN_HEIGHT * 0.15} x2={SCREEN_WIDTH * 0.85} y2={SCREEN_HEIGHT * 0.25} stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
           </Svg>
         </View>
       </LinearGradient>
@@ -166,7 +206,7 @@ export const LoginScreen: React.FC = () => {
                     onPress={() => setRememberMe(!rememberMe)}
                   >
                     <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                      {rememberMe && <Ionicons name="checkmark" size={14} color="#FF9B9B" />}
+                      {rememberMe && <Ionicons name="checkmark" size={14} color="#E372A1" />}
                     </View>
                     <Text style={styles.rememberText}>Remember Me</Text>
                   </TouchableOpacity>
@@ -269,10 +309,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#E372A1',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF9B9B',
+    shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -293,7 +333,7 @@ const styles = StyleSheet.create({
   underline: {
     width: 60,
     height: 3,
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#E372A1',
     borderRadius: 2,
   },
   inputContainer: {
@@ -342,7 +382,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#FF9B9B',
+    borderColor: '#E372A1',
     marginRight: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -356,11 +396,11 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    color: '#FF9B9B',
+    color: '#E372A1',
     fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#E372A1',
     height: 52,
     borderRadius: 12,
     alignItems: 'center',
@@ -384,7 +424,7 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     fontSize: 14,
-    color: '#FF9B9B',
+    color: '#E372A1',
     fontWeight: '600',
   },
 });
