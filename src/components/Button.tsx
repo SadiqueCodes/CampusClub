@@ -1,17 +1,17 @@
 import React from 'react';
 import { TouchableOpacity, Text, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'small' | 'medium' | 'large';
   disabled?: boolean;
   loading?: boolean;
-  backgroundColor?: string;
-  textColor?: string;
   style?: ViewStyle;
+  fullWidth?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -21,76 +21,110 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'medium',
   disabled = false,
   loading = false,
-  backgroundColor,
-  textColor,
   style,
+  fullWidth = false,
 }) => {
-  const getButtonStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      borderRadius: theme.borderRadius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: disabled ? 0.5 : 1,
-    };
-
-    const sizeStyles = {
-      small: { paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md },
-      medium: { paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg },
-      large: { paddingVertical: theme.spacing.lg, paddingHorizontal: theme.spacing.xl },
-    };
-
-    const variantStyles: Record<string, ViewStyle> = {
-      primary: {
-        backgroundColor: backgroundColor || theme.colors.blue.indigo,
-      },
-      secondary: {
-        backgroundColor: backgroundColor || theme.colors.green.neonLime,
-      },
-      outline: {
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: backgroundColor || theme.colors.white,
-      },
-    };
-
-    return {
-      ...baseStyle,
-      ...sizeStyles[size],
-      ...variantStyles[variant],
-    };
+  const sizeStyles = {
+    small: {
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      height: 40,
+    },
+    medium: {
+      paddingVertical: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.xxl,
+      height: 48,
+    },
+    large: {
+      paddingVertical: theme.spacing.xl,
+      paddingHorizontal: theme.spacing.xxxl,
+      height: 56,
+    },
   };
 
-  const getTextStyle = (): TextStyle => {
-    const sizeStyles = {
-      small: { fontSize: theme.fontSize.sm },
-      medium: { fontSize: theme.fontSize.md },
-      large: { fontSize: theme.fontSize.lg },
-    };
+  const textSizes = {
+    small: theme.fontSize.sm,
+    medium: theme.fontSize.md,
+    large: theme.fontSize.lg,
+  };
 
-    const variantStyles: Record<string, TextStyle> = {
-      primary: { color: textColor || theme.colors.white },
-      secondary: { color: textColor || theme.colors.text.dark },
-      outline: { color: textColor || theme.colors.white },
-    };
+  const baseContainerStyle: ViewStyle = {
+    borderRadius: theme.borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: disabled ? 0.6 : 1,
+    ...sizeStyles[size],
+    ...(fullWidth && { width: '100%' }),
+    ...theme.shadows.md,
+  };
 
-    return {
-      ...sizeStyles[size],
-      ...variantStyles[variant],
-      fontWeight: theme.fontWeight.bold,
-    };
+  const textStyle: TextStyle = {
+    fontSize: textSizes[size],
+    fontWeight: theme.fontWeight.semibold,
+    letterSpacing: 0.3,
+  };
+
+  if (variant === 'primary' && !disabled) {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        activeOpacity={0.85}
+        style={style}
+      >
+        <LinearGradient
+          colors={[theme.colors.primary[600], theme.colors.primary[700]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={baseContainerStyle}
+        >
+          {loading ? (
+            <ActivityIndicator color={theme.colors.white} />
+          ) : (
+            <Text style={[textStyle, { color: theme.colors.white }]}>{title}</Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  }
+
+  const variantStyles: Record<string, ViewStyle> = {
+    primary: {
+      backgroundColor: theme.colors.primary[600],
+    },
+    secondary: {
+      backgroundColor: theme.colors.neutral[100],
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary[600],
+      ...theme.shadows.none,
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      ...theme.shadows.none,
+    },
+  };
+
+  const textColors: Record<string, string> = {
+    primary: theme.colors.white,
+    secondary: theme.colors.neutral[900],
+    outline: theme.colors.primary[600],
+    ghost: theme.colors.primary[600],
   };
 
   return (
     <TouchableOpacity
-      style={[getButtonStyle(), style]}
+      style={[baseContainerStyle, variantStyles[variant], style]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'secondary' ? theme.colors.text.dark : theme.colors.white} />
+        <ActivityIndicator color={textColors[variant]} />
       ) : (
-        <Text style={getTextStyle()}>{title}</Text>
+        <Text style={[textStyle, { color: textColors[variant] }]}>{title}</Text>
       )}
     </TouchableOpacity>
   );

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Button, Input, Card } from '../components';
 import { SwipeCard } from '../components/SwipeCard';
 import { theme } from '../theme';
@@ -67,7 +69,7 @@ export const CreateClubScreen: React.FC = () => {
     },
   ]);
 
-  const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Other'];
+  const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
 
   const handleCreateClub = () => {
     if (!clubName || !clubDescription || !currentUser) return;
@@ -135,11 +137,11 @@ export const CreateClubScreen: React.FC = () => {
     return (
       <View style={styles.swipeContainer}>
         <View style={styles.swipeHeader}>
-          <TouchableOpacity onPress={() => setIsSwipeMode(false)}>
-            <Text style={styles.backButton}>← Back</Text>
+          <TouchableOpacity onPress={() => setIsSwipeMode(false)} style={styles.backButtonContainer}>
+            <Ionicons name="arrow-back" size={24} color="#2D3436" />
           </TouchableOpacity>
           <Text style={styles.swipeTitle}>Find Members</Text>
-          <View style={{ width: 60 }} />
+          <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.swipeCardContainer}>
@@ -150,17 +152,17 @@ export const CreateClubScreen: React.FC = () => {
               onSwipeRight={handleSwipeRight}
             />
           ) : (
-            <Card style={styles.endCard}>
-              <Text style={styles.endCardText}>🎉</Text>
+            <View style={styles.endCard}>
+              <Ionicons name="checkmark-circle" size={80} color="#10B981" />
               <Text style={styles.endCardTitle}>All Done!</Text>
               <Text style={styles.endCardSubtitle}>You've reviewed all potential members</Text>
-              <Button
-                title="Go to My Clubs"
+              <TouchableOpacity
+                style={styles.doneButton}
                 onPress={() => setIsSwipeMode(false)}
-                backgroundColor={theme.colors.blue.indigo}
-                style={{ marginTop: theme.spacing.lg }}
-              />
-            </Card>
+              >
+                <Text style={styles.doneButtonText}>Go to My Clubs</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -170,14 +172,14 @@ export const CreateClubScreen: React.FC = () => {
             onPress={handleSwipeLeft}
             disabled={currentProfileIndex >= potentialMembers.length}
           >
-            <Text style={styles.swipeButtonText}>✖ PASS</Text>
+            <Ionicons name="close" size={32} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.swipeButton, styles.inviteButton]}
             onPress={handleSwipeRight}
             disabled={currentProfileIndex >= potentialMembers.length}
           >
-            <Text style={styles.swipeButtonText}>✓ INVITE</Text>
+            <Ionicons name="heart" size={32} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -188,19 +190,27 @@ export const CreateClubScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>➕ Create a Club</Text>
+          <Text style={styles.headerTitle}>Create a Club</Text>
         </View>
 
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🎯</Text>
-          <Text style={styles.emptyTitle}>CREATE YOUR FIRST CLUB</Text>
-          <Text style={styles.emptySubtitle}>Start building your community</Text>
-          <Button
-            title="+ CREATE"
-            onPress={() => setShowCreateModal(true)}
-            backgroundColor={theme.colors.blue.indigo}
+          <LinearGradient
+            colors={['#FF9B9B', '#FFB4B4']}
+            style={styles.emptyIcon}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="people" size={48} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.emptyTitle}>Create Your First Club</Text>
+          <Text style={styles.emptySubtitle}>Start building your community and connect with students who share your interests</Text>
+          <TouchableOpacity
             style={styles.createButton}
-          />
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Ionicons name="add-circle" size={20} color="#fff" />
+            <Text style={styles.createButtonText}>Create Club</Text>
+          </TouchableOpacity>
         </View>
 
         <CreateClubModal
@@ -222,42 +232,55 @@ export const CreateClubScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🎯 Your Clubs</Text>
+        <Text style={styles.headerTitle}>Your Clubs</Text>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Ionicons name="add" size={24} color="#FF9B9B" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.clubsList}>
         {myClubs.map((club) => (
-          <Card key={club.id} style={styles.clubCard}>
-            <View style={styles.clubHeader}>
-              <View>
-                <Text style={styles.clubCardTitle}>{club.name}</Text>
-                <Text style={styles.clubStats}>👥 {club.memberCount} members</Text>
-                <Text style={styles.clubStats}>📅 {club.upcomingEvents} upcoming events</Text>
+          <TouchableOpacity key={club.id} style={styles.clubCard}>
+            <LinearGradient
+              colors={['#FF9B9B', '#FFB4B4']}
+              style={styles.clubCardGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="people" size={28} color="#fff" />
+            </LinearGradient>
+            <View style={styles.clubInfo}>
+              <Text style={styles.clubCardTitle}>{club.name}</Text>
+              <View style={styles.clubStatsRow}>
+                <View style={styles.clubStatItem}>
+                  <Ionicons name="people-outline" size={14} color="#6B7280" />
+                  <Text style={styles.clubStatText}>{club.memberCount} members</Text>
+                </View>
+                <View style={styles.clubStatItem}>
+                  <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                  <Text style={styles.clubStatText}>{club.upcomingEvents} events</Text>
+                </View>
               </View>
-              <TouchableOpacity
-                style={styles.addMembersButton}
-                onPress={() => setIsSwipeMode(true)}
-              >
-                <Text style={styles.addMembersText}>+</Text>
-              </TouchableOpacity>
             </View>
-            <View style={styles.clubActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>View Details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>Manage Events</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
+            <TouchableOpacity
+              style={styles.addMembersButton}
+              onPress={() => setIsSwipeMode(true)}
+            >
+              <Ionicons name="person-add" size={20} color="#FF9B9B" />
+            </TouchableOpacity>
+          </TouchableOpacity>
         ))}
 
-        <Button
-          title="+ CREATE NEW CLUB"
-          onPress={() => setShowCreateModal(true)}
-          variant="outline"
+        <TouchableOpacity
           style={styles.createNewButton}
-        />
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Ionicons name="add-circle-outline" size={24} color="#FF9B9B" />
+          <Text style={styles.createNewButtonText}>Create New Club</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <CreateClubModal
@@ -289,6 +312,7 @@ const CreateClubModal: React.FC<{
   onSubmit: () => void;
 }> = ({ visible, onClose, clubName, setClubName, clubType, setClubType, clubDescription, setClubDescription, clubTypes, onSubmit }) => {
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [customTypeName, setCustomTypeName] = useState('');
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -296,8 +320,8 @@ const CreateClubModal: React.FC<{
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create New Club</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={28} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
 
@@ -310,13 +334,15 @@ const CreateClubModal: React.FC<{
             />
 
             <View style={{ marginBottom: theme.spacing.md }}>
-              <Text style={styles.label}>Club Type:</Text>
+              <Text style={styles.label}>Club Type</Text>
               <TouchableOpacity
                 style={styles.pickerButton}
                 onPress={() => setShowTypePicker(!showTypePicker)}
               >
-                <Text style={styles.pickerButtonText}>{clubType}</Text>
-                <Text>▼</Text>
+                <Text style={styles.pickerButtonText}>
+                  {clubType === 'Custom' && customTypeName ? customTypeName : clubType}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
               </TouchableOpacity>
 
               {showTypePicker && (
@@ -330,29 +356,51 @@ const CreateClubModal: React.FC<{
                         setShowTypePicker(false);
                       }}
                     >
-                      <Text style={styles.pickerOptionText}>• {type}</Text>
+                      <Text style={styles.pickerOptionText}>{type}</Text>
+                      {clubType === type && (
+                        <Ionicons name="checkmark" size={20} color="#FF9B9B" />
+                      )}
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
             </View>
 
-            <Input
-              label="Description"
-              placeholder="Enter description..."
-              value={clubDescription}
-              onChangeText={setClubDescription}
-              multiline
-              numberOfLines={4}
-              style={{ height: 100, textAlignVertical: 'top' }}
-            />
+            {clubType === 'Custom' && (
+              <View style={{ marginBottom: theme.spacing.md }}>
+                <Text style={styles.label}>Custom Type Name</Text>
+                <TextInput
+                  style={styles.customTypeInput}
+                  placeholder="Enter custom club type..."
+                  placeholderTextColor="#D1D5DB"
+                  value={customTypeName}
+                  onChangeText={setCustomTypeName}
+                />
+              </View>
+            )}
 
-            <Button
-              title="CREATE & INVITE →"
+            <View style={{ marginBottom: theme.spacing.md }}>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                style={styles.descriptionInput}
+                placeholder="Describe your club..."
+                placeholderTextColor="#D1D5DB"
+                value={clubDescription}
+                onChangeText={setClubDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, (!clubName || !clubDescription) && styles.submitButtonDisabled]}
               onPress={onSubmit}
-              backgroundColor={theme.colors.blue.indigo}
               disabled={!clubName || !clubDescription}
-            />
+            >
+              <Text style={styles.submitButtonText}>Create & Invite Members</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
@@ -363,229 +411,362 @@ const CreateClubModal: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.create,
+    backgroundColor: '#FAFAFA',
   },
   header: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3436',
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.xl,
+    padding: 32,
   },
-  emptyEmoji: {
-    fontSize: 80,
-    marginBottom: theme.spacing.lg,
+  emptyIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#FF9B9B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   emptyTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.sm,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#2D3436',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.xl,
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
   createButton: {
-    minWidth: 200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF9B9B',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#FF9B9B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
   },
   clubsList: {
-    padding: theme.spacing.lg,
+    padding: 20,
+    paddingBottom: 100,
   },
   clubCard: {
-    marginBottom: theme.spacing.md,
-  },
-  clubHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.md,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  clubCardGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  clubInfo: {
+    flex: 1,
   },
   clubCardTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.xs,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 6,
   },
-  clubStats: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.xs,
+  clubStatsRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  clubStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  clubStatText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 4,
   },
   addMembersButton: {
     width: 40,
     height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.blue.indigo,
+    borderRadius: 20,
+    backgroundColor: '#FFF1F1',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addMembersText: {
-    fontSize: 24,
-    color: theme.colors.white,
-    fontWeight: theme.fontWeight.bold,
-  },
-  clubActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    padding: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.blue.indigo,
-    borderRadius: theme.borderRadius.sm,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.blue.indigo,
-    fontWeight: theme.fontWeight.semibold,
-  },
   createNewButton: {
-    marginTop: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: '#FF9B9B',
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  createNewButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF9B9B',
+    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: theme.colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    width: '90%',
-    maxHeight: SCREEN_HEIGHT * 0.8,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: SCREEN_HEIGHT * 0.85,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
+    marginBottom: 24,
   },
   modalTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#2D3436',
   },
   closeButton: {
-    fontSize: 24,
-    color: theme.colors.text.darkGrey,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.xs,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 8,
   },
   pickerButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
-    padding: theme.spacing.md,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
   },
   pickerButtonText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.dark,
+    fontSize: 15,
+    color: '#2D3436',
   },
   pickerOptions: {
-    marginTop: theme.spacing.xs,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: theme.colors.white,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
   },
   pickerOption: {
-    padding: theme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: '#F3F4F6',
   },
   pickerOptionText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.dark,
+    fontSize: 15,
+    color: '#2D3436',
+  },
+  customTypeInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#2D3436',
+  },
+  descriptionInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#2D3436',
+    height: 120,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF9B9B',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    gap: 8,
+    shadowColor: '#FF9B9B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginRight: 8,
   },
   swipeContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background.create,
+    backgroundColor: '#FAFAFA',
   },
   swipeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#fff',
   },
-  backButton: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.dark,
-    fontWeight: theme.fontWeight.semibold,
+  backButtonContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   swipeTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3436',
   },
   swipeCardContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.lg,
+    padding: 20,
   },
   endCard: {
     alignItems: 'center',
-    padding: theme.spacing.xxl,
-  },
-  endCardText: {
-    fontSize: 64,
-    marginBottom: theme.spacing.md,
+    padding: 40,
   },
   endCardTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.sm,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3436',
+    marginTop: 24,
+    marginBottom: 8,
   },
   endCardSubtitle: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.darkGrey,
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
+    marginBottom: 32,
+  },
+  doneButton: {
+    backgroundColor: '#FF9B9B',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#FF9B9B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   swipeActions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: theme.spacing.xl,
-    padding: theme.spacing.xl,
+    alignItems: 'center',
+    gap: 40,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   swipeButton: {
-    width: 120,
-    height: 60,
-    borderRadius: theme.borderRadius.full,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     alignItems: 'center',
     justifyContent: 'center',
-    ...theme.shadows.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   passButton: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: '#EF4444',
   },
   inviteButton: {
-    backgroundColor: theme.colors.success,
-  },
-  swipeButtonText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
+    backgroundColor: '#FF9B9B',
   },
 });

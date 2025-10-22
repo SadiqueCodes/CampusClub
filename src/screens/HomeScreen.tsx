@@ -1,10 +1,14 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../components';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import { Club, Event, MarketplaceItem } from '../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -135,15 +139,88 @@ export const HomeScreen: React.FC = () => {
     }
   }, []);
 
+  const getClubIcon = (type: string) => {
+    switch (type) {
+      case 'Arts & Culture':
+        return 'color-palette';
+      case 'Technology':
+        return 'code-slash';
+      case 'Sports':
+        return 'football';
+      case 'Academic':
+        return 'book';
+      case 'Social':
+        return 'people';
+      default:
+        return 'star';
+    }
+  };
+
+  const getClubGradient = (type: string): [string, string] => {
+    switch (type) {
+      case 'Arts & Culture':
+        return ['#FF9B9B', '#FFB4B4'];
+      case 'Technology':
+        return ['#6366F1', '#8B5CF6'];
+      case 'Sports':
+        return ['#10B981', '#34D399'];
+      case 'Academic':
+        return ['#F59E0B', '#FBBF24'];
+      case 'Social':
+        return ['#EC4899', '#F472B6'];
+      default:
+        return ['#6366F1', '#8B5CF6'];
+    }
+  };
+
+  // Get popular clubs: clubs with >5 members OR clubs with upcoming events
+  const getPopularClubs = () => {
+    const popularClubs = clubs.filter(club => club.memberCount > 5 || club.upcomingEvents > 0);
+
+    // Sort by popularity (member count + events)
+    const sorted = popularClubs.sort((a, b) => {
+      const scoreA = a.memberCount + (a.upcomingEvents * 10);
+      const scoreB = b.memberCount + (b.upcomingEvents * 10);
+      return scoreB - scoreA;
+    });
+
+    // Return top 5 or all if less than 5
+    return sorted.slice(0, 5);
+  };
+
+  const popularClubs = getPopularClubs();
+
   const renderClubCard = ({ item }: { item: Club }) => (
     <TouchableOpacity style={styles.clubCard}>
-      <View style={styles.clubIcon}>
-        <Text style={styles.clubEmoji}>
-          {item.type === 'Arts & Culture' ? '🎨' : item.type === 'Technology' ? '💻' : '⚽'}
-        </Text>
-      </View>
-      <Text style={styles.clubName}>{item.name}</Text>
-      <Text style={styles.clubMembers}>👥 {item.memberCount}</Text>
+      <LinearGradient
+        colors={getClubGradient(item.type)}
+        style={styles.clubCardGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.clubCardInner}>
+          <View style={styles.clubCardContent}>
+            <View style={styles.clubCardHeader}>
+              <View style={styles.clubLogoContainer}>
+                {item.logo ? (
+                  <Image source={{ uri: item.logo }} style={styles.clubLogo} />
+                ) : (
+                  <Ionicons name={getClubIcon(item.type) as any} size={20} color="#fff" />
+                )}
+              </View>
+              <View style={styles.clubCardBadge}>
+                <Ionicons name="people" size={10} color="#fff" />
+                <Text style={styles.clubCardBadgeText}>{item.memberCount}</Text>
+              </View>
+            </View>
+            <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
+            <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
+          </View>
+          <TouchableOpacity style={styles.applyButton}>
+            <Text style={styles.applyButtonText}>Apply</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
@@ -151,69 +228,122 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🏠 CampusClub</Text>
+        <Text style={styles.greeting}>Hello, {currentUser?.name || 'Student'}</Text>
         <TouchableOpacity style={styles.notificationButton}>
-          <Text style={styles.notificationIcon}>🔔</Text>
+          <Ionicons name="notifications-outline" size={20} color="#2D3436" />
+          <View style={styles.notificationBadge} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Top Clubs Carousel */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Top Clubs Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Clubs</Text>
-          <FlatList
-            horizontal
-            data={clubs}
-            renderItem={renderClubCard}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.clubsList}
-          />
+        <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>Popular Clubs</Text>
+     </View>
+          {popularClubs.length > 0 ? (
+            <FlatList
+              horizontal
+              data={popularClubs}
+              renderItem={renderClubCard}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.clubsList}
+            />
+          ) : (
+            <View style={styles.emptyClubs}>
+              <Text style={styles.emptyClubsText}>No popular clubs yet</Text>
+            </View>
+          )}
         </View>
 
         {/* Events Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📅 Upcoming Events</Text>
+          <View style={styles.eventsHeaderRow}>
+            <Text style={styles.sectionTitle}>Upcoming Events</Text>
             {isClubLeader && (
               <TouchableOpacity style={styles.addButton}>
-                <Text style={styles.addButtonText}>+</Text>
+                <Ionicons name="add" size={20} color="#fff" />
               </TouchableOpacity>
             )}
           </View>
 
-          {events.length === 0 && isClubLeader && (
-            <Card style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No events yet. Create your first event!</Text>
-            </Card>
+          {events.length === 0 && isClubLeader ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyStateText}>No events yet</Text>
+              <Text style={styles.emptyStateSubtext}>Create your first event!</Text>
+            </View>
+          ) : (
+            events.map((event) => (
+              <TouchableOpacity key={event.id} style={styles.eventCard}>
+                <View style={styles.eventIconContainer}>
+                  <LinearGradient
+                    colors={['#FF9B9B', '#FFB4B4']}
+                    style={styles.eventIconGradient}
+                  >
+                    <Ionicons name="calendar" size={20} color="#fff" />
+                  </LinearGradient>
+                </View>
+                <View style={styles.eventContent}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="location-outline" size={14} color="#6B7280" />
+                    <Text style={styles.eventDetailText}>{event.location}</Text>
+                  </View>
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="time-outline" size={14} color="#6B7280" />
+                    <Text style={styles.eventDetailText}>
+                      {event.date.toLocaleDateString()} at {event.time}
+                    </Text>
+                  </View>
+                  <View style={styles.eventDetailRow}>
+                    <Ionicons name="people-outline" size={14} color="#6B7280" />
+                    <Text style={styles.eventDetailText}>{event.clubName}</Text>
+                  </View>
+                </View>
+                <View style={styles.interestedBadge}>
+                  <Ionicons name="heart" size={12} color="#FF9B9B" />
+                  <Text style={styles.interestedCount}>{event.interestedCount}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
           )}
-
-          {events.map((event) => (
-            <Card key={event.id} style={styles.eventCard}>
-              <Text style={styles.eventTitle}>{event.title}</Text>
-              <Text style={styles.eventDetail}>📍 {event.location}</Text>
-              <Text style={styles.eventDetail}>
-                🕒 {event.date.toLocaleDateString()} at {event.time}
-              </Text>
-              <Text style={styles.eventDetail}>👥 Hosted by: {event.clubName}</Text>
-            </Card>
-          ))}
         </View>
 
         {/* Marketplace Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🛒 Marketplace</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Marketplace</Text>
+          </View>
           <View style={styles.marketplaceGrid}>
             {marketplaceItems.map((item) => (
               <TouchableOpacity key={item.id} style={styles.marketplaceItem}>
                 <View style={styles.itemImagePlaceholder}>
-                  <Text style={styles.itemEmoji}>
-                    {item.title.includes('Camera') ? '📷' : item.title.includes('Book') ? '📚' : '🎧'}
+                  <Ionicons
+                    name={
+                      item.title.includes('Camera')
+                        ? 'camera'
+                        : item.title.includes('Book')
+                        ? 'book'
+                        : 'headset'
+                    }
+                    size={32}
+                    color="#9CA3AF"
+                  />
+                </View>
+                <Text style={styles.itemTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.itemPrice}>${item.price}</Text>
+                <View style={styles.sellerRow}>
+                  <Ionicons name="person-circle-outline" size={12} color="#9CA3AF" />
+                  <Text style={styles.sellerName} numberOfLines={1}>
+                    {item.sellerName}
                   </Text>
                 </View>
-                <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.itemPrice}>${item.price}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -226,149 +356,308 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.home,
+    backgroundColor: '#FAFAFA',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: '#FAFAFA',
   },
-  headerTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
+  greeting: {
+    fontSize: 14,
+    color: '#6B7280',
   },
   notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.white + '20',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  notificationIcon: {
-    fontSize: 20,
+  notificationBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF9B9B',
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginTop: 24,
   },
   sectionHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  eventsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3436',
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF9B9B',
   },
   clubsList: {
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: 20,
   },
   clubCard: {
-    width: 120,
-    marginRight: theme.spacing.md,
-    alignItems: 'center',
+    width: 280,
+    marginRight: 16,
   },
-  clubIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.sm,
-    ...theme.shadows.sm,
+  clubCardGradient: {
+    borderRadius: 16,
+    padding: 16,
+    height: 160,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  clubEmoji: {
-    fontSize: 40,
+  clubCardInner: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
-  clubName: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.white,
-    textAlign: 'center',
-    marginBottom: theme.spacing.xs,
+  clubCardContent: {
+    flex: 0,
   },
-  clubMembers: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.white + 'CC',
+  clubCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  addButton: {
+  clubLogoContainer: {
     width: 36,
     height: 36,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accent.home,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  clubLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+  },
+  clubCardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  clubCardBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  clubCardName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  clubCardType: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+  },
+  applyButton: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 8,
+  },
+  applyButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2D3436',
+  },
+  emptyClubs: {
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyClubsText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF9B9B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF9B9B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    padding: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginTop: 12,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  eventCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  eventIconContainer: {
+    marginRight: 12,
+  },
+  eventIconGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonText: {
-    fontSize: 24,
-    color: theme.colors.text.dark,
-    fontWeight: theme.fontWeight.bold,
-  },
-  emptyState: {
-    marginHorizontal: theme.spacing.lg,
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.darkGrey,
-    textAlign: 'center',
-  },
-  eventCard: {
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+  eventContent: {
+    flex: 1,
   },
   eventTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.sm,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 8,
   },
-  eventDetail: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.xs,
+  eventDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 6,
+  },
+  eventDetailText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 6,
+  },
+  interestedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF1F1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    height: 24,
+    gap: 4,
+  },
+  interestedCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF9B9B',
+    marginLeft: 4,
   },
   marketplaceGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   marketplaceItem: {
-    width: '30%',
-    marginRight: '3.33%',
-    marginBottom: theme.spacing.md,
+    width: (SCREEN_WIDTH - 64) / 3,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   itemImagePlaceholder: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  itemEmoji: {
-    fontSize: 32,
+    marginBottom: 8,
   },
   itemTitle: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.white,
-    marginBottom: theme.spacing.xs,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 4,
   },
   itemPrice: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.accent.home,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF9B9B',
+    marginBottom: 4,
+  },
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sellerName: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    flex: 1,
+    marginLeft: 4,
   },
 });

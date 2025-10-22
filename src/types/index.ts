@@ -26,11 +26,12 @@ export interface Club {
   memberCount: number;
   createdAt: Date;
   groupChatId: string;
+  logo?: string; // Club logo/icon uploaded by user
   coverPhoto?: string;
   upcomingEvents: number;
 }
 
-export type ClubType = 'Academic' | 'Sports' | 'Arts & Culture' | 'Technology' | 'Social' | 'Other';
+export type ClubType = 'Academic' | 'Sports' | 'Arts & Culture' | 'Technology' | 'Social' | 'Custom';
 
 export interface Event {
   id: string;

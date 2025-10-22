@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Card } from '../components';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import { Chat } from '../types';
 
 export const ChatScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const { chats, currentUser, setChats } = useStore();
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export const ChatScreen: React.FC = () => {
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => (
-    <TouchableOpacity>
+    <TouchableOpacity onPress={() => navigation.navigate('ChatDetail', { chatId: item.id })}>
       <Card style={styles.chatCard}>
         <View style={styles.chatHeader}>
           <View style={styles.chatIcon}>
