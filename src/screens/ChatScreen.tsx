@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../components';
-import { theme } from '../theme';
 import { useStore } from '../store';
 import { Chat } from '../types';
 
@@ -83,51 +82,60 @@ export const ChatScreen: React.FC = () => {
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('ChatDetail', { chatId: item.id })}>
-      <Card style={styles.chatCard}>
-        <View style={styles.chatHeader}>
-          <View style={styles.chatIcon}>
-            <Ionicons
-              name={item.type === 'group' ? 'people' : 'person'}
-              size={24}
-              color="#fff"
-            />
-          </View>
-          <View style={styles.chatInfo}>
-            <View style={styles.chatTitleRow}>
-              <Text style={styles.chatTitle}>
-                {item.type === 'group' ? item.name : 'John Doe'}
-              </Text>
-              <Text style={styles.chatTime}>
-                {formatTime(item.lastMessageTime)}
-              </Text>
-            </View>
-            <Text style={styles.chatMessage} numberOfLines={1}>
-              {item.lastMessage.senderId === currentUser?.id ? 'You: ' : `${item.lastMessage.senderName}: `}
-              {item.lastMessage.text}
+    <TouchableOpacity
+      style={styles.chatCard}
+      onPress={() => navigation.navigate('ChatDetail', { chatId: item.id })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.chatHeader}>
+        <View style={styles.chatIcon}>
+          <Ionicons
+            name={item.type === 'group' ? 'people' : 'person'}
+            size={24}
+            color="#fff"
+          />
+        </View>
+        <View style={styles.chatInfo}>
+          <View style={styles.chatTitleRow}>
+            <Text style={styles.chatTitle}>
+              {item.type === 'group' ? item.name : 'John Doe'}
             </Text>
-            {item.type === 'direct' && item.marketplaceItemId && (
-              <Text style={styles.chatTag}>Marketplace</Text>
-            )}
+            <Text style={styles.chatTime}>
+              {formatTime(item.lastMessageTime)}
+            </Text>
           </View>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unreadCount}</Text>
+          <Text style={styles.chatMessage} numberOfLines={2}>
+            {item.lastMessage.senderId === currentUser?.id ? 'You: ' : `${item.lastMessage.senderName}: `}
+            {item.lastMessage.text}
+          </Text>
+          {item.type === 'direct' && item.marketplaceItemId && (
+            <View style={styles.chatTagContainer}>
+              <Text style={styles.chatTag}>Marketplace</Text>
             </View>
           )}
         </View>
-      </Card>
+        {item.unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{item.unreadCount}</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search-outline" size={20} color="#2D3436" />
-        </TouchableOpacity>
-      </View>
+      <LinearGradient
+        colors={['#E372A1', '#CE678A', '#B06579']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <TouchableOpacity style={styles.searchButton}>
+            <Ionicons name="search-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       <FlatList
         data={chats}
@@ -143,47 +151,65 @@ export const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.chat,
+    backgroundColor: '#F8F9FA',
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
   },
   searchButton: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.white,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chatList: {
-    padding: theme.spacing.lg,
+    padding: 20,
+    paddingBottom: 100,
   },
   chatCard: {
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   chatIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: '#FF9B9B',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#E372A1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.md,
+    marginRight: 14,
   },
   chatInfo: {
     flex: 1,
@@ -191,38 +217,49 @@ const styles = StyleSheet.create({
   chatTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.xs,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   chatTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   chatTime: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.text.darkGrey,
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   chatMessage: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.xs,
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  chatTagContainer: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
   },
   chatTag: {
-    fontSize: theme.fontSize.xs,
-    color: '#FF9B9B',
-    fontWeight: theme.fontWeight.semibold,
+    fontSize: 11,
+    color: '#E372A1',
+    fontWeight: '700',
+    backgroundColor: '#FFF5F8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   unreadBadge: {
-    width: 24,
+    minWidth: 24,
     height: 24,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: '#FF9B9B',
+    borderRadius: 12,
+    backgroundColor: '#E372A1',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   unreadText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

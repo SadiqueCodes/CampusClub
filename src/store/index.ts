@@ -20,6 +20,7 @@ interface AppState {
   events: Event[];
   setEvents: (events: Event[]) => void;
   addEvent: (event: Event) => void;
+  updateEvent: (eventId: string, updates: Partial<Event>) => void;
   toggleEventInterest: (eventId: string, userId: string) => void;
 
   // Marketplace
@@ -75,20 +76,23 @@ export const useStore = create<AppState>((set, get) => ({
 
   // Clubs state
   clubs: [],
-  myClubs: [],
+  get myClubs() {
+    const state = get();
+    return state.clubs.filter((club) =>
+      club.memberIds.includes(state.currentUser?.id || '')
+    );
+  },
 
   setClubs: (clubs) => set({ clubs }),
 
   addClub: (club) =>
     set((state) => ({
       clubs: [...state.clubs, club],
-      myClubs: [...state.myClubs, club],
     })),
 
   updateClub: (clubId, updates) =>
     set((state) => ({
       clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, ...updates } : c)),
-      myClubs: state.myClubs.map((c) => (c.id === clubId ? { ...c, ...updates } : c)),
     })),
 
   // Events state
@@ -97,6 +101,11 @@ export const useStore = create<AppState>((set, get) => ({
   setEvents: (events) => set({ events }),
 
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
+
+  updateEvent: (eventId, updates) =>
+    set((state) => ({
+      events: state.events.map((e) => (e.id === eventId ? { ...e, ...updates } : e)),
+    })),
 
   toggleEventInterest: (eventId, userId) =>
     set((state) => ({

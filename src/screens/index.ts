@@ -1,6 +1,11 @@
+export { WelcomeScreen } from './WelcomeScreen';
 export { LoginScreen } from './LoginScreen';
 export { HomeScreen } from './HomeScreen';
 export { CreateClubScreen } from './CreateClubScreen';
+export { AddEventScreen } from './AddEventScreen';
+export { EventDetailScreen } from './EventDetailScreen';
+export { ManageEventScreen } from './ManageEventScreen';
+export { EventsScreen } from './EventsScreen';
 export { ChatScreen } from './ChatScreen';
 export { ChatDetailScreen } from './ChatDetailScreen';
 export { ProfileScreen } from './ProfileScreen';

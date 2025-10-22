@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Circle, Line } from 'react-native-svg';
-import { theme } from '../theme';
+import Svg, { Path } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -16,30 +15,80 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     <View style={styles.container}>
       {/* Pink Gradient Background */}
       <LinearGradient
-        colors={['#FFB4B4', '#FF9B9B', '#FF8C8C']}
+        colors={['#E372A1', '#CE678A', '#B06579']}
         style={styles.gradient}
       >
-        {/* Abstract Pattern Overlay */}
-        <View style={styles.patternContainer}>
-          <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT * 0.6} style={styles.pattern}>
-            {/* Wave patterns */}
-            <Path
-              d={`M0,${SCREEN_HEIGHT * 0.15} Q${SCREEN_WIDTH * 0.25},${SCREEN_HEIGHT * 0.1} ${SCREEN_WIDTH * 0.5},${SCREEN_HEIGHT * 0.15} T${SCREEN_WIDTH},${SCREEN_HEIGHT * 0.15}`}
-              stroke="rgba(255,255,255,0.15)"
-              strokeWidth="2"
-              fill="none"
-            />
-            <Path
-              d={`M0,${SCREEN_HEIGHT * 0.25} Q${SCREEN_WIDTH * 0.3},${SCREEN_HEIGHT * 0.2} ${SCREEN_WIDTH * 0.6},${SCREEN_HEIGHT * 0.25} T${SCREEN_WIDTH},${SCREEN_HEIGHT * 0.25}`}
-              stroke="rgba(255,255,255,0.1)"
-              strokeWidth="2"
-              fill="none"
-            />
-            <Circle cx={SCREEN_WIDTH * 0.2} cy={SCREEN_HEIGHT * 0.1} r="30" stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
-            <Circle cx={SCREEN_WIDTH * 0.8} cy={SCREEN_HEIGHT * 0.35} r="40" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none" />
-            <Line x1={SCREEN_WIDTH * 0.1} y1={SCREEN_HEIGHT * 0.3} x2={SCREEN_WIDTH * 0.3} y2={SCREEN_HEIGHT * 0.4} stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
-            <Line x1={SCREEN_WIDTH * 0.7} y1={SCREEN_HEIGHT * 0.15} x2={SCREEN_WIDTH * 0.85} y2={SCREEN_HEIGHT * 0.25} stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
-          </Svg>
+        <View style={styles.topSection}>
+          <Text style={styles.appName}>CampusClub</Text>
+          <Text style={styles.tagline}>Your Campus Community</Text>
+
+          {/* Feature Cards */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsContainer}
+            style={styles.cardsScroll}
+          >
+            <View style={styles.featureCard}>
+              <LinearGradient
+                colors={['#fff', '#F8F9FA']}
+                style={styles.featureCardGradient}
+              >
+                <View style={styles.featureIconContainer}>
+                  <LinearGradient
+                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    style={styles.featureIcon}
+                  >
+                    <Ionicons name="people" size={32} color="#fff" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.featureTitle}>Join Clubs</Text>
+                <Text style={styles.featureDescription}>
+                  Connect with students who share your interests
+                </Text>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.featureCard}>
+              <LinearGradient
+                colors={['#fff', '#F8F9FA']}
+                style={styles.featureCardGradient}
+              >
+                <View style={styles.featureIconContainer}>
+                  <LinearGradient
+                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    style={styles.featureIcon}
+                  >
+                    <Ionicons name="calendar" size={32} color="#fff" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.featureTitle}>Events</Text>
+                <Text style={styles.featureDescription}>
+                  Discover and attend exciting campus events
+                </Text>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.featureCard}>
+              <LinearGradient
+                colors={['#fff', '#F8F9FA']}
+                style={styles.featureCardGradient}
+              >
+                <View style={styles.featureIconContainer}>
+                  <LinearGradient
+                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    style={styles.featureIcon}
+                  >
+                    <Ionicons name="chatbubbles" size={32} color="#fff" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.featureTitle}>Chat</Text>
+                <Text style={styles.featureDescription}>
+                  Stay connected with your community
+                </Text>
+              </LinearGradient>
+            </View>
+          </ScrollView>
         </View>
       </LinearGradient>
 
@@ -52,16 +101,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           />
         </Svg>
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.title}>Welcome to CampusClub</Text>
           <Text style={styles.subtitle}>
-            Connect with your college community.{'\n'}Join clubs, attend events, and make friends.
+            Connect with your college community, join clubs, discover events, and make lasting friendships.
           </Text>
 
           <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
-            <Text style={styles.continueText}>Continue</Text>
-            <View style={styles.arrowCircle}>
+            <LinearGradient
+              colors={['#E372A1', '#CE678A', '#B06579']}
+              style={styles.continueButtonGradient}
+            >
+              <Text style={styles.continueText}>Get Started</Text>
               <Ionicons name="arrow-forward" size={20} color="#fff" />
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -79,22 +131,80 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.55,
+    height: SCREEN_HEIGHT * 0.6,
   },
-  patternContainer: {
-    flex: 1,
+  topSection: {
+    paddingTop: 80,
+    paddingHorizontal: 30,
   },
-  pattern: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
+  appName: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 40,
+    fontWeight: '500',
+  },
+  cardsScroll: {
+    marginHorizontal: -30,
+  },
+  cardsContainer: {
+    paddingHorizontal: 30,
+    gap: 16,
+  },
+  featureCard: {
+    width: SCREEN_WIDTH * 0.7,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  featureCardGradient: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  featureIconContainer: {
+    marginBottom: 16,
+  },
+  featureIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  featureTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  featureDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontWeight: '500',
   },
   bottomSection: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.5,
+    height: SCREEN_HEIGHT * 0.45,
   },
   curve: {
     position: 'absolute',
@@ -108,35 +218,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1F2937',
     marginBottom: 16,
   },
   subtitle: {
     fontSize: 15,
-    color: '#636E72',
-    lineHeight: 22,
-    marginBottom: 60,
+    color: '#6B7280',
+    lineHeight: 24,
+    marginBottom: 40,
+    fontWeight: '500',
   },
   continueButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#E372A1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  continueButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 10,
   },
   continueText: {
     fontSize: 18,
-    color: '#636E72',
-    fontWeight: '500',
-  },
-  arrowCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FF9B9B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadows.md,
+    color: '#fff',
+    fontWeight: '700',
   },
 });

@@ -136,13 +136,23 @@ export const CreateClubScreen: React.FC = () => {
   if (isSwipeMode) {
     return (
       <View style={styles.swipeContainer}>
-        <View style={styles.swipeHeader}>
-          <TouchableOpacity onPress={() => setIsSwipeMode(false)} style={styles.backButtonContainer}>
-            <Ionicons name="arrow-back" size={24} color="#2D3436" />
-          </TouchableOpacity>
-          <Text style={styles.swipeTitle}>Find Members</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <LinearGradient
+          colors={['#E372A1', '#CE678A', '#B06579']}
+          style={styles.swipeHeaderGradient}
+        >
+          <View style={styles.swipeHeader}>
+            <TouchableOpacity onPress={() => setIsSwipeMode(false)} style={styles.backButtonContainer}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.swipeTitle}>Find Members</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>
+              {currentProfileIndex + 1} / {potentialMembers.length}
+            </Text>
+          </View>
+        </LinearGradient>
 
         <View style={styles.swipeCardContainer}>
           {currentProfileIndex < potentialMembers.length ? (
@@ -153,14 +163,24 @@ export const CreateClubScreen: React.FC = () => {
             />
           ) : (
             <View style={styles.endCard}>
-              <Ionicons name="checkmark-circle" size={80} color="#10B981" />
+              <LinearGradient
+                colors={['#E372A1', '#CE678A', '#B06579']}
+                style={styles.endCardIcon}
+              >
+                <Ionicons name="checkmark-circle" size={60} color="#fff" />
+              </LinearGradient>
               <Text style={styles.endCardTitle}>All Done!</Text>
               <Text style={styles.endCardSubtitle}>You've reviewed all potential members</Text>
               <TouchableOpacity
                 style={styles.doneButton}
                 onPress={() => setIsSwipeMode(false)}
               >
-                <Text style={styles.doneButtonText}>Go to My Clubs</Text>
+                <LinearGradient
+                  colors={['#E372A1', '#CE678A', '#B06579']}
+                  style={styles.doneButtonGradient}
+                >
+                  <Text style={styles.doneButtonText}>Go to My Clubs</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
@@ -171,13 +191,18 @@ export const CreateClubScreen: React.FC = () => {
             style={[styles.swipeButton, styles.passButton]}
             onPress={handleSwipeLeft}
             disabled={currentProfileIndex >= potentialMembers.length}
+            activeOpacity={0.7}
           >
             <Ionicons name="close" size={32} color="#fff" />
           </TouchableOpacity>
+          <View style={styles.swipeHint}>
+            <Text style={styles.swipeHintText}>Swipe or tap</Text>
+          </View>
           <TouchableOpacity
             style={[styles.swipeButton, styles.inviteButton]}
             onPress={handleSwipeRight}
             disabled={currentProfileIndex >= potentialMembers.length}
+            activeOpacity={0.7}
           >
             <Ionicons name="heart" size={32} color="#fff" />
           </TouchableOpacity>
@@ -189,13 +214,18 @@ export const CreateClubScreen: React.FC = () => {
   if (myClubs.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Create a Club</Text>
-        </View>
+        <LinearGradient
+          colors={['#E372A1', '#CE678A', '#B06579']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>My Clubs</Text>
+          </View>
+        </LinearGradient>
 
         <View style={styles.emptyContainer}>
           <LinearGradient
-            colors={['#FF9B9B', '#FFB4B4']}
+            colors={['#E372A1', '#CE678A', '#B06579']}
             style={styles.emptyIcon}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -208,8 +238,13 @@ export const CreateClubScreen: React.FC = () => {
             style={styles.createButton}
             onPress={() => setShowCreateModal(true)}
           >
-            <Ionicons name="add-circle" size={20} color="#fff" />
-            <Text style={styles.createButtonText}>Create Club</Text>
+            <LinearGradient
+              colors={['#E372A1', '#CE678A', '#B06579']}
+              style={styles.createButtonGradient}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.createButtonText}>Create Club</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -411,27 +446,35 @@ const CreateClubModal: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F8F9FA',
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#fff',
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontWeight: '800',
+    color: '#fff',
   },
   headerButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF1F1',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -448,44 +491,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
-    shadowColor: '#FF9B9B',
+    shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
     marginBottom: 32,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
     paddingHorizontal: 20,
+    fontWeight: '500',
   },
   createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF9B9B',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#FF9B9B',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  createButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    gap: 8,
   },
   createButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
     marginLeft: 8,
   },
@@ -680,29 +726,46 @@ const styles = StyleSheet.create({
   },
   swipeContainer: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F8F9FA',
+  },
+  swipeHeaderGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   swipeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#fff',
+    marginBottom: 12,
   },
   backButtonContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   swipeTitle: {
     fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  progressContainer: {
+    alignItems: 'center',
+  },
+  progressText: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#2D3436',
+    color: 'rgba(255,255,255,0.9)',
   },
   swipeCardContainer: {
     flex: 1,
@@ -714,10 +777,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  endCardIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#E372A1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
   endCardTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontWeight: '800',
+    color: '#1F2937',
     marginTop: 24,
     marginBottom: 8,
   },
@@ -726,30 +801,45 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 32,
+    fontWeight: '500',
   },
   doneButton: {
-    backgroundColor: '#FF9B9B',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#FF9B9B',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  doneButtonGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
   },
   doneButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
   },
   swipeActions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 40,
+    gap: 30,
     paddingVertical: 40,
     paddingHorizontal: 20,
+    backgroundColor: '#fff',
+  },
+  swipeHint: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+  },
+  swipeHintText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
   },
   swipeButton: {
     width: 70,
@@ -767,6 +857,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   inviteButton: {
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#10B981',
   },
 });

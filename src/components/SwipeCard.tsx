@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -8,12 +8,14 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolation,
+  withTiming,
 } from 'react-native-reanimated';
-import { theme } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { User } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 
 interface SwipeCardProps {
   user: User;
@@ -24,25 +26,24 @@ interface SwipeCardProps {
 export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipeRight }) => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
+
+  // Reset position when user changes
+  useEffect(() => {
+    translateX.value = 0;
+    translateY.value = 0;
+  }, [user.id]);
 
   const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      startX.value = translateX.value;
-      startY.value = translateY.value;
-    })
     .onUpdate((event) => {
-      translateX.value = startX.value + event.translationX;
-      translateY.value = startY.value + event.translationY;
+      translateX.value = event.translationX;
+      translateY.value = event.translationY;
     })
     .onEnd((event) => {
-      if (event.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withSpring(SCREEN_WIDTH * 1.5);
-        runOnJS(onSwipeRight)();
-      } else if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withSpring(-SCREEN_WIDTH * 1.5);
-        runOnJS(onSwipeLeft)();
+      if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
+        const direction = event.translationX > 0 ? 1 : -1;
+        translateX.value = withTiming(direction * SCREEN_WIDTH * 1.5, { duration: 300 }, () => {
+          runOnJS(direction > 0 ? onSwipeRight : onSwipeLeft)();
+        });
       } else {
         translateX.value = withSpring(0);
         translateY.value = withSpring(0);
@@ -80,35 +81,66 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.card, animatedStyle]}>
         <View style={styles.cardInner}>
-          {user.profilePhoto ? (
-            <Image source={{ uri: user.profilePhoto }} style={styles.profilePhoto} />
-          ) : (
-            <View style={[styles.profilePhoto, styles.placeholderPhoto]}>
-              <Text style={styles.placeholderText}>{user.name.charAt(0)}</Text>
+          {/* Profile Photo */}
+          <LinearGradient
+            colors={['#E372A1', '#CE678A', '#B06579']}
+            style={styles.profilePhoto}
+          >
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
             </View>
-          )}
+          </LinearGradient>
 
+          {/* Swipe Stamps */}
           <Animated.View style={[styles.likeStamp, likeOpacityStyle]}>
-            <Text style={styles.stampText}>✓ INVITE</Text>
+            <Ionicons name="heart" size={32} color="#fff" />
+            <Text style={styles.stampText}>INVITE</Text>
           </Animated.View>
 
           <Animated.View style={[styles.nopeStamp, nopeOpacityStyle]}>
-            <Text style={styles.stampText}>✖ PASS</Text>
+            <Ionicons name="close" size={32} color="#fff" />
+            <Text style={styles.stampText}>PASS</Text>
           </Animated.View>
 
+          {/* User Info */}
           <View style={styles.infoContainer}>
-            <Text style={styles.name}>{user.name}, {user.year === 'Freshman' ? '1st' : user.year === 'Sophomore' ? '2nd' : user.year === 'Junior' ? '3rd' : '4th'} Year</Text>
-            <Text style={styles.major}>{user.major}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{user.name}</Text>
+              <View style={styles.yearBadge}>
+                <Text style={styles.yearText}>
+                  {user.year === 'Freshman' ? '1st' : user.year === 'Sophomore' ? '2nd' : user.year === 'Junior' ? '3rd' : '4th'} Year
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="school" size={16} color="#B06579" />
+              <Text style={styles.major}>{user.major}</Text>
+            </View>
 
             {user.interests.length > 0 && (
-              <View style={styles.interestsContainer}>
-                <Text style={styles.interestsLabel}>🎯 Interested in:</Text>
-                <Text style={styles.interests}>{user.interests.join(', ')}</Text>
+              <View style={styles.interestsSection}>
+                <View style={styles.interestsHeader}>
+                  <Ionicons name="heart" size={16} color="#B06579" />
+                  <Text style={styles.interestsLabel}>Interests</Text>
+                </View>
+                <View style={styles.interestsTags}>
+                  {user.interests.slice(0, 4).map((interest, index) => (
+                    <View key={index} style={styles.interestTag}>
+                      <Text style={styles.interestText}>{interest}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
 
             {user.clubsJoined.length > 0 && (
-              <Text style={styles.clubs}>📚 {user.clubsJoined.length} clubs joined</Text>
+              <View style={styles.statsRow}>
+                <Ionicons name="people" size={16} color="#6B7280" />
+                <Text style={styles.statsText}>{user.clubsJoined.length} clubs joined</Text>
+                <Ionicons name="calendar" size={16} color="#6B7280" style={styles.statsIcon} />
+                <Text style={styles.statsText}>{user.eventsAttended} events attended</Text>
+              </View>
             )}
           </View>
         </View>
@@ -120,85 +152,166 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
 const styles = StyleSheet.create({
   card: {
     width: SCREEN_WIDTH * 0.9,
-    height: 500,
+    height: 550,
     position: 'absolute',
   },
   cardInner: {
     flex: 1,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.lg,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
     overflow: 'hidden',
   },
   profilePhoto: {
     width: '100%',
-    height: 300,
-    backgroundColor: theme.colors.border,
-  },
-  placeholderPhoto: {
+    height: 280,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.blue.indigo,
   },
-  placeholderText: {
-    fontSize: 80,
-    color: theme.colors.white,
-    fontWeight: theme.fontWeight.bold,
+  avatarCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  avatarText: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#B06579',
   },
   infoContainer: {
-    padding: theme.spacing.lg,
+    padding: 20,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   name: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.xs,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
+    flex: 1,
+  },
+  yearBadge: {
+    backgroundColor: '#FFF5F8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  yearText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B06579',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
   major: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.md,
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '600',
   },
-  interestsContainer: {
-    marginBottom: theme.spacing.sm,
+  interestsSection: {
+    marginBottom: 16,
+  },
+  interestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
   },
   interestsLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text.dark,
-    marginBottom: theme.spacing.xs,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  interests: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text.darkGrey,
+  interestsTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  clubs: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text.darkGrey,
+  interestTag: {
+    backgroundColor: '#FFF5F8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E372A1',
+  },
+  interestText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B06579',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statsIcon: {
+    marginLeft: 12,
+  },
+  statsText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   likeStamp: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     right: 30,
-    backgroundColor: theme.colors.success,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.sm,
-    transform: [{ rotate: '15deg' }],
+    backgroundColor: '#10B981',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    transform: [{ rotate: '20deg' }],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   nopeStamp: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     left: 30,
-    backgroundColor: theme.colors.error,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.sm,
-    transform: [{ rotate: '-15deg' }],
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    transform: [{ rotate: '-20deg' }],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   stampText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });

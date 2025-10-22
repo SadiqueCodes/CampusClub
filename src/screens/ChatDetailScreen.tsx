@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../theme';
 import { useStore } from '../store';
 import { Message } from '../types';
 
@@ -97,20 +97,25 @@ export const ChatDetailScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={90}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#2D3436" />
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'John Doe'}</Text>
-          <Text style={styles.headerSubtitle}>
-            {chat.type === 'group' ? `${chat.participantIds.length} members` : 'Active now'}
-          </Text>
+      <LinearGradient
+        colors={['#E372A1', '#CE678A', '#B06579']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'John Doe'}</Text>
+            <Text style={styles.headerSubtitle}>
+              {chat.type === 'group' ? `${chat.participantIds.length} members` : 'Active now'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.moreButton}>
+            <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#2D3436" />
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <FlatList
         ref={flatListRef}
@@ -124,19 +129,23 @@ export const ChatDetailScreen: React.FC = () => {
 
       <View style={styles.inputContainer}>
         <TouchableOpacity style={styles.attachButton}>
-          <Ionicons name="attach" size={24} color="#9CA3AF" />
+          <Ionicons name="add-circle" size={28} color="#B06579" />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder="Type a message..."
-          placeholderTextColor={theme.colors.text.darkGrey + '80'}
+          placeholderTextColor="#9CA3AF"
           value={messageText}
           onChangeText={setMessageText}
           multiline
           maxLength={500}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-          <Ionicons name="send" size={20} color="#FF9B9B" />
+        <TouchableOpacity
+          style={[styles.sendButton, messageText.trim() && styles.sendButtonActive]}
+          onPress={handleSendMessage}
+          disabled={!messageText.trim()}
+        >
+          <Ionicons name="send" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -146,48 +155,55 @@ export const ChatDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.chat,
+    backgroundColor: '#F8F9FA',
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 12,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    paddingTop: theme.spacing.xxl,
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    paddingHorizontal: 16,
   },
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: 12,
   },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text.dark,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.text.darkGrey,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '500',
   },
   moreButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   messagesList: {
-    padding: theme.spacing.md,
+    padding: 16,
+    paddingBottom: 20,
   },
   messageContainer: {
-    marginBottom: theme.spacing.md,
-    maxWidth: '80%',
+    marginBottom: 12,
+    maxWidth: '75%',
   },
   ownMessage: {
     alignSelf: 'flex-end',
@@ -196,88 +212,104 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   messageBubble: {
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
+    borderRadius: 16,
+    padding: 12,
   },
   ownBubble: {
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#E372A1',
+    borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   senderName: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text.darkGrey,
-    marginBottom: theme.spacing.xs,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
   },
   messageText: {
-    fontSize: theme.fontSize.md,
-    marginBottom: theme.spacing.xs,
+    fontSize: 15,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   ownMessageText: {
-    color: theme.colors.white,
+    color: '#fff',
   },
   otherMessageText: {
-    color: theme.colors.text.dark,
+    color: '#1F2937',
   },
   messageTime: {
-    fontSize: theme.fontSize.xs,
+    fontSize: 11,
   },
   ownMessageTime: {
-    color: theme.colors.white + 'CC',
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'right',
   },
   otherMessageTime: {
-    color: theme.colors.text.darkGrey,
+    color: '#9CA3AF',
   },
   systemMessageContainer: {
     alignItems: 'center',
-    marginVertical: theme.spacing.md,
+    marginVertical: 16,
   },
   systemMessageText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.text.darkGrey,
-    backgroundColor: theme.colors.white,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
+    fontSize: 12,
+    color: '#9CA3AF',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
+    padding: 16,
+    paddingBottom: 100,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: '#F3F4F6',
   },
   attachButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: 8,
   },
   input: {
     flex: 1,
-    backgroundColor: theme.colors.background.chat,
-    borderRadius: theme.borderRadius.full,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text.dark,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#1F2937',
     maxHeight: 100,
   },
   sendButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: theme.spacing.sm,
+    marginLeft: 8,
+  },
+  sendButtonActive: {
+    backgroundColor: '#E372A1',
   },
   errorText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.error,
+    fontSize: 16,
+    color: '#EF4444',
     textAlign: 'center',
-    marginTop: theme.spacing.xxl,
+    marginTop: 40,
   },
 });

@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Line, Defs, Pattern, Rect } from 'react-native-svg';
+import { useFonts } from 'expo-font';
+import { Lobster_400Regular } from '@expo-google-fonts/lobster';
 import { Card } from '../components';
 import { theme } from '../theme';
 import { useStore } from '../store';
@@ -14,6 +16,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { clubs, events, marketplaceItems, currentUser } = useStore();
+
+  const [fontsLoaded] = useFonts({
+    Lobster_400Regular,
+  });
 
   // Mock data initialization
   useEffect(() => {
@@ -251,9 +257,7 @@ export const HomeScreen: React.FC = () => {
         style={styles.headerGradient}
       >
         <View style={styles.header}>
-          <Text style={styles.greeting}>
-            Hello, <Text style={styles.userName}>{currentUser?.name || 'Student'}</Text>
-          </Text>
+          <Text style={styles.greeting}>CampusClub</Text>
           <TouchableOpacity style={styles.notificationButton}>
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             <View style={styles.notificationBadge} />
@@ -285,8 +289,11 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.eventsHeaderRow}>
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
             {isClubLeader && (
-              <TouchableOpacity style={styles.addButton}>
-                <Ionicons name="add" size={20} color="#fff" />
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => navigation.navigate('AddEvent')}
+              >
+                <Ionicons name="add" size={18} color="#fff" />
               </TouchableOpacity>
             )}
           </View>
@@ -298,75 +305,89 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.emptyStateSubtext}>Create your first event!</Text>
             </View>
           ) : (
-            events.map((event) => (
-              <TouchableOpacity key={event.id} style={styles.eventCard}>
-                <View style={styles.eventIconContainer}>
-                  <LinearGradient
-                    colors={['#E372A1', '#F48FB1']}
-                    style={styles.eventIconGradient}
-                  >
-                    <Ionicons name="calendar" size={20} color="#fff" />
-                  </LinearGradient>
-                </View>
-                <View style={styles.eventContent}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="location-outline" size={14} color="#6B7280" />
-                    <Text style={styles.eventDetailText}>{event.location}</Text>
-                  </View>
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="time-outline" size={14} color="#6B7280" />
-                    <Text style={styles.eventDetailText}>
-                      {event.date.toLocaleDateString()} at {event.time}
+            <View style={styles.eventsContainer}>
+              {events.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.eventCard}
+                  onPress={() => navigation.navigate('EventDetail', { event: item })}
+                >
+                  <View style={styles.eventDateBadge}>
+                    <Text style={styles.eventDateDay}>{item.date.getDate()}</Text>
+                    <Text style={styles.eventDateMonth}>
+                      {item.date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
                     </Text>
                   </View>
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="people-outline" size={14} color="#6B7280" />
-                    <Text style={styles.eventDetailText}>{event.clubName}</Text>
+
+                  <View style={styles.eventDetailsContainer}>
+                    <View style={styles.eventHeader}>
+                      <Text style={styles.eventTitle}>{item.title}</Text>
+                    </View>
+
+                    <View style={styles.eventMetaContainer}>
+                      <View style={styles.eventMetaItem}>
+                        <Ionicons name="time" size={14} color="#6B7280" />
+                        <Text style={styles.eventMetaText}>{item.time}</Text>
+                      </View>
+                      <View style={styles.eventMetaDivider} />
+                      <View style={styles.eventMetaItem}>
+                        <Ionicons name="location" size={14} color="#6B7280" />
+                        <Text style={styles.eventMetaText} numberOfLines={1}>{item.location}</Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.interestedBadge}>
-                  <Ionicons name="heart" size={12} color="#E372A1" />
-                  <Text style={styles.interestedCount}>{event.interestedCount}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </View>
 
         {/* Marketplace Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Marketplace</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeMoreText}>See More</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.marketplaceGrid}>
             {marketplaceItems.map((item) => (
               <TouchableOpacity key={item.id} style={styles.marketplaceItem}>
-                <View style={styles.itemImagePlaceholder}>
-                  <Ionicons
-                    name={
-                      item.title.includes('Camera')
-                        ? 'camera'
-                        : item.title.includes('Book')
-                        ? 'book'
-                        : 'headset'
-                    }
-                    size={32}
-                    color="#9CA3AF"
-                  />
-                </View>
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.itemPrice}>${item.price}</Text>
-                <View style={styles.sellerRow}>
-                  <Ionicons name="person-circle-outline" size={12} color="#9CA3AF" />
+                {item.images && item.images.length > 0 ? (
+                  <Image source={{ uri: item.images[0] }} style={styles.itemImage} />
+                ) : (
+                  <View style={styles.itemImagePlaceholder}>
+                    <Ionicons
+                      name={
+                        item.title.includes('Camera')
+                          ? 'camera'
+                          : item.title.includes('Book')
+                          ? 'book'
+                          : 'headset'
+                      }
+                      size={28}
+                      color="#B06579"
+                    />
+                  </View>
+                )}
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.itemPrice}>${item.price}</Text>
                   <Text style={styles.sellerName} numberOfLines={1}>
                     {item.sellerName}
                   </Text>
                 </View>
               </TouchableOpacity>
             ))}
+
+            {/* Add Item Card */}
+            <TouchableOpacity style={styles.addItemCard}>
+              <View style={styles.addItemIconContainer}>
+                <Ionicons name="add" size={32} color="#B06579" />
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -397,9 +418,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   greeting: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 28,
+    fontFamily: 'Lobster_400Regular',
     color: '#fff',
+    letterSpacing: 1,
   },
   userName: {
     fontSize: 16,
@@ -440,6 +462,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E372A1',
   },
   eventsHeaderRow: {
     flexDirection: 'row',
@@ -560,9 +587,9 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#E372A1',
     alignItems: 'center',
     justifyContent: 'center',
@@ -595,64 +622,91 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 4,
   },
+  eventsContainer: {
+    paddingHorizontal: 20,
+  },
   eventCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 18,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E372A1',
   },
-  eventIconContainer: {
-    marginRight: 12,
-  },
-  eventIconGradient: {
-    width: 48,
-    height: 48,
+  eventDateBadge: {
+    width: 55,
+    height: 55,
+    backgroundColor: '#FFF5F8',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 14,
   },
-  eventContent: {
-    flex: 1,
+  eventDateDay: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#B06579',
+    lineHeight: 26,
   },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2D3436',
-    marginBottom: 8,
-  },
-  eventDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
-  },
-  eventDetailText: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginLeft: 6,
-  },
-  interestedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFE8F1',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    height: 28,
-    gap: 4,
-  },
-  interestedCount: {
-    fontSize: 12,
+  eventDateMonth: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#E372A1',
-    marginLeft: 4,
+    letterSpacing: 0.5,
+  },
+  eventDetailsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  eventHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  eventTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  eventClubBadge: {
+    backgroundColor: '#FFF5F8',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  eventClubName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B06579',
+  },
+  eventMetaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  eventMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eventMetaDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#E5E7EB',
+  },
+  eventMetaText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   marketplaceGrid: {
     flexDirection: 'row',
@@ -660,47 +714,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
+  addItemCard: {
+    width: '48%',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 160,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  addItemIconContainer: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
   marketplaceItem: {
-    width: (SCREEN_WIDTH - 64) / 3,
+    width: '48%',
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 10,
+    padding: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  itemImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: '#F3F4F6',
   },
   itemImagePlaceholder: {
     width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#F3F4F6',
+    height: 100,
+    backgroundColor: '#FFF5F8',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  itemInfo: {
+    gap: 4,
   },
   itemTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#2D3436',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   itemPrice: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#E372A1',
-    marginBottom: 4,
-  },
-  sellerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   sellerName: {
     fontSize: 11,
     color: '#9CA3AF',
-    flex: 1,
-    marginLeft: 4,
+    fontWeight: '500',
   },
 });
