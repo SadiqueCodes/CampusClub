@@ -9,7 +9,6 @@ import { AddEventScreen } from '../screens/AddEventScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { ManageEventScreen } from '../screens/ManageEventScreen';
 import { EventsScreen } from '../screens/EventsScreen';
-import { ClubsScreen } from '../screens/ClubsScreen';
 import { CreateClubScreen } from '../screens/CreateClubScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
@@ -53,7 +52,6 @@ const ChatStackNavigator: React.FC = () => {
 const ClubsStackNavigator: React.FC = () => {
   return (
     <ClubsStack.Navigator screenOptions={{ headerShown: false }}>
-      <ClubsStack.Screen name="ClubsList" component={ClubsScreen} />
       <ClubsStack.Screen name="CreateClub" component={CreateClubScreen} />
     </ClubsStack.Navigator>
   );
