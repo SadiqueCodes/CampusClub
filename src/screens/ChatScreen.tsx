@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { Chat } from '../types';
+import { theme } from '../theme';
 
 export const ChatScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -151,18 +152,18 @@ export const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.chat,
   },
   headerGradient: {
     paddingTop: 50,
     paddingBottom: 16,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 30,
+    elevation: 12,
   },
   header: {
     flexDirection: 'row',
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.white,
   },
   searchButton: {
     width: 44,
@@ -188,15 +189,17 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   chatCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 8,
   },
   chatHeader: {
     flexDirection: 'row',
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#E372A1',
+    backgroundColor: 'rgba(91,99,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -223,16 +226,16 @@ const styles = StyleSheet.create({
   chatTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
   },
   chatTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   chatMessage: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     lineHeight: 20,
   },
   chatTagContainer: {
@@ -241,9 +244,9 @@ const styles = StyleSheet.create({
   },
   chatTag: {
     fontSize: 11,
-    color: '#E372A1',
+    color: theme.colors.accent.neon,
     fontWeight: '700',
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(56,189,248,0.12)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -252,7 +255,7 @@ const styles = StyleSheet.create({
     minWidth: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#E372A1',
+    backgroundColor: theme.colors.accent.magenta,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
@@ -260,6 +263,6 @@ const styles = StyleSheet.create({
   unreadText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
   },
 });

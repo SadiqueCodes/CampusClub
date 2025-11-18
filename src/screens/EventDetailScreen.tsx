@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Event } from '../types';
 import { useStore } from '../store';
+import { theme } from '../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -59,7 +60,7 @@ export const EventDetailScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header with Back Button */}
       <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
+        colors={theme.colors.gradients.chat}
         style={styles.header}
       >
         <TouchableOpacity
@@ -81,7 +82,7 @@ export const EventDetailScreen: React.FC = () => {
         ) : (
           <View style={styles.bannerPlaceholder}>
             <LinearGradient
-              colors={['#E372A1', '#CE678A', '#B06579']}
+              colors={theme.colors.gradients.create}
               style={styles.bannerGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -99,7 +100,7 @@ export const EventDetailScreen: React.FC = () => {
           {/* Organized By Badge */}
           <View style={styles.organizedByContainer}>
             <View style={styles.organizedByBadge}>
-              <Ionicons name="people" size={16} color="#B06579" />
+              <Ionicons name="people" size={16} color={theme.colors.accent.neon} />
               <Text style={styles.organizedByText}>Organized by</Text>
               <Text style={styles.clubName}>{event.clubName}</Text>
             </View>
@@ -110,7 +111,7 @@ export const EventDetailScreen: React.FC = () => {
             {/* Date & Time Card */}
             <View style={styles.infoCard}>
               <View style={styles.infoIconContainer}>
-                <Ionicons name="calendar-outline" size={24} color="#B06579" />
+                <Ionicons name="calendar-outline" size={24} color={theme.colors.accent.neon} />
               </View>
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Date & Time</Text>
@@ -129,7 +130,7 @@ export const EventDetailScreen: React.FC = () => {
             {/* Location Card */}
             <View style={styles.infoCard}>
               <View style={styles.infoIconContainer}>
-                <Ionicons name="location-outline" size={24} color="#B06579" />
+                <Ionicons name="location-outline" size={24} color={theme.colors.accent.neon} />
               </View>
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Location</Text>
@@ -140,7 +141,7 @@ export const EventDetailScreen: React.FC = () => {
             {/* Interested Card */}
             <View style={styles.infoCard}>
               <View style={styles.infoIconContainer}>
-                <Ionicons name="heart-outline" size={24} color="#B06579" />
+                <Ionicons name="heart-outline" size={24} color={theme.colors.accent.neon} />
               </View>
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Interested</Text>
@@ -169,7 +170,7 @@ export const EventDetailScreen: React.FC = () => {
           <Ionicons
             name={isInterested ? 'heart' : 'heart-outline'}
             size={22}
-            color="#B06579"
+            color={theme.colors.accent.neon}
           />
           <Text style={styles.interestedButtonText}>Interested</Text>
         </TouchableOpacity>
@@ -179,7 +180,7 @@ export const EventDetailScreen: React.FC = () => {
           onPress={handleRegister}
         >
           <LinearGradient
-            colors={['#E372A1', '#CE678A', '#B06579']}
+            colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
             style={styles.joinButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -195,7 +196,7 @@ export const EventDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.chat,
   },
   header: {
     paddingTop: 50,
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
   },
   shareButton: {
     width: 40,
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   banner: {
     width: SCREEN_WIDTH,
     height: 220,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.card,
   },
   bannerPlaceholder: {
     width: SCREEN_WIDTH,
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 16,
     lineHeight: 34,
   },
@@ -256,7 +257,7 @@ const styles = StyleSheet.create({
   organizedByBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(91,99,255,0.12)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
@@ -265,13 +266,13 @@ const styles = StyleSheet.create({
   },
   organizedByText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   clubName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#B06579',
+    color: theme.colors.accent.neon,
   },
   infoSection: {
     marginBottom: 24,
@@ -279,22 +280,24 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
     gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 4,
   },
   infoIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -303,19 +306,19 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '600',
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 2,
   },
   infoSubValue: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   descriptionSection: {
@@ -324,12 +327,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 12,
   },
   description: {
     fontSize: 15,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     lineHeight: 24,
     fontWeight: '400',
   },
@@ -341,14 +344,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     paddingBottom: 24,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: theme.colors.border,
     gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
     elevation: 10,
   },
   interestedButton: {
@@ -360,24 +363,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#fff',
+    borderColor: theme.colors.border,
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
   interestedButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#B06579',
+    color: theme.colors.accent.neon,
     lineHeight: 20,
   },
   joinButton: {
     flex: 1,
     borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 8,
   },
   joinButtonGradient: {
     paddingVertical: 16,

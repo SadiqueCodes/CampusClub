@@ -127,25 +127,35 @@ export const ChatDetailScreen: React.FC = () => {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.attachButton}>
-          <Ionicons name="add-circle" size={28} color="#B06579" />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#9CA3AF"
-          value={messageText}
-          onChangeText={setMessageText}
-          multiline
-          maxLength={500}
-        />
+      <View style={styles.composer}>
+        <View style={styles.composerInputWrapper}>
+          <TextInput
+            style={styles.composerInput}
+            placeholder="Send a message..."
+            placeholderTextColor="rgba(31,41,55,0.4)"
+            value={messageText}
+            onChangeText={setMessageText}
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity style={styles.composerAccessory}>
+            <Ionicons name="happy-outline" size={20} color="#A0AEC0" />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          style={[styles.sendButton, messageText.trim() && styles.sendButtonActive]}
+          style={styles.sendButtonWrapper}
           onPress={handleSendMessage}
           disabled={!messageText.trim()}
         >
-          <Ionicons name="send" size={20} color="#fff" />
+          <LinearGradient
+            colors={['#E372A1', '#B06579']}
+            style={[
+              styles.sendButtonGradient,
+              !messageText.trim() && styles.sendButtonGradientDisabled,
+            ]}
+          >
+            <Ionicons name="send" size={18} color="#fff" />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -268,43 +278,53 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  inputContainer: {
+  composer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 100,
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    gap: 12,
   },
-  attachButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  input: {
+  composerInputWrapper: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  composerInput: {
+    flex: 1,
     fontSize: 15,
     color: '#1F2937',
     maxHeight: 100,
   },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
+  composerAccessory: {
     marginLeft: 8,
   },
-  sendButtonActive: {
-    backgroundColor: '#E372A1',
+  sendButtonWrapper: {
+    width: 52,
+    height: 52,
+  },
+  sendButtonGradient: {
+    flex: 1,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#E372A1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  sendButtonGradientDisabled: {
+    opacity: 0.5,
   },
   errorText: {
     fontSize: 16,

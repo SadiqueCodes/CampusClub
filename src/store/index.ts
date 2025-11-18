@@ -15,6 +15,7 @@ interface AppState {
   setClubs: (clubs: Club[]) => void;
   addClub: (club: Club) => void;
   updateClub: (clubId: string, updates: Partial<Club>) => void;
+  removeClubMember: (clubId: string, memberId: string) => void;
 
   // Events
   events: Event[];
@@ -93,6 +94,20 @@ export const useStore = create<AppState>((set, get) => ({
   updateClub: (clubId, updates) =>
     set((state) => ({
       clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, ...updates } : c)),
+    })),
+
+  removeClubMember: (clubId, memberId) =>
+    set((state) => ({
+      clubs: state.clubs.map((club) => {
+        if (club.id !== clubId) return club;
+        const memberIds = club.memberIds.filter((id) => id !== memberId);
+        const delta = club.memberIds.includes(memberId) ? 1 : 0;
+        return {
+          ...club,
+          memberIds,
+          memberCount: Math.max(0, club.memberCount - delta),
+        };
+      }),
     })),
 
   // Events state

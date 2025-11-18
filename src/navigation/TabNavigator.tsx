@@ -62,38 +62,25 @@ export const TabNavigator: React.FC = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          height: 75,
-          paddingBottom: 12,
-          paddingTop: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 8,
-        },
-        tabBarActiveTintColor: '#E372A1',
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 4,
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: theme.colors.white,
+        tabBarInactiveTintColor: theme.colors.text.muted,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tab.Screen
         name="Chat"
         component={ChatStackNavigator}
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.iconWrapperFocused]}>
+              <Ionicons
+                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+                size={22}
+                color={focused ? theme.colors.white : theme.colors.text.muted}
+              />
+            </View>
           ),
         }}
       />
@@ -101,12 +88,14 @@ export const TabNavigator: React.FC = () => {
         name="Events"
         component={EventsStackNavigator}
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'calendar' : 'calendar-outline'}
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.iconWrapperFocused]}>
+              <Ionicons
+                name={focused ? 'calendar' : 'calendar-outline'}
+                size={22}
+                color={focused ? theme.colors.white : theme.colors.text.muted}
+              />
+            </View>
           ),
         }}
       />
@@ -117,7 +106,7 @@ export const TabNavigator: React.FC = () => {
           tabBarIcon: ({ focused }) => (
             <View style={styles.centerTabContainer}>
               <LinearGradient
-                colors={['#E372A1', '#CE678A', '#B06579']}
+                colors={[theme.colors.primary[600], theme.colors.accent.magenta]}
                 style={styles.centerTab}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -133,12 +122,14 @@ export const TabNavigator: React.FC = () => {
         name="Clubs"
         component={ClubsStackNavigator}
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'people' : 'people-outline'}
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.iconWrapperFocused]}>
+              <Ionicons
+                name={focused ? 'people' : 'people-outline'}
+                size={22}
+                color={focused ? theme.colors.white : theme.colors.text.muted}
+              />
+            </View>
           ),
         }}
       />
@@ -146,12 +137,14 @@ export const TabNavigator: React.FC = () => {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.iconWrapper, focused && styles.iconWrapperFocused]}>
+              <Ionicons
+                name={focused ? 'person' : 'person-outline'}
+                size={22}
+                color={focused ? theme.colors.white : theme.colors.text.muted}
+              />
+            </View>
           ),
         }}
       />
@@ -160,6 +153,33 @@ export const TabNavigator: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 20,
+    height: 80,
+    borderRadius: 32,
+    backgroundColor: 'rgba(7,11,22,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    paddingTop: 12,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  tabItem: {
+    marginHorizontal: 4,
+  },
   centerTabContainer: {
     position: 'absolute',
     top: -20,
@@ -172,12 +192,28 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 4,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.background.chat,
+  },
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapperFocused: {
+    backgroundColor: 'rgba(56,189,248,0.12)',
+    shadowColor: theme.colors.accent.neon,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
   },
 });

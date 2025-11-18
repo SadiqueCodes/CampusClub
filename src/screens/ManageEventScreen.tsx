@@ -18,8 +18,9 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Event } from '../types';
 import { useStore } from '../store';
+import { theme } from '../theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const ManageEventScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -91,7 +92,7 @@ export const ManageEventScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
+        colors={theme.colors.gradients.chat}
         style={styles.header}
       >
         <TouchableOpacity
@@ -116,7 +117,7 @@ export const ManageEventScreen: React.FC = () => {
         ) : (
           <View style={styles.bannerPlaceholder}>
             <LinearGradient
-              colors={['#E372A1', '#CE678A', '#B06579']}
+              colors={theme.colors.gradients.create}
               style={styles.bannerGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -135,7 +136,7 @@ export const ManageEventScreen: React.FC = () => {
           <View style={styles.statsSection}>
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={28} color={theme.colors.success.main} />
               </View>
               <Text style={styles.statValue}>{registeredUsers.length}</Text>
               <Text style={styles.statLabel}>Registered</Text>
@@ -143,7 +144,7 @@ export const ManageEventScreen: React.FC = () => {
 
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="heart" size={28} color="#E372A1" />
+                <Ionicons name="heart" size={28} color={theme.colors.accent.magenta} />
               </View>
               <Text style={styles.statValue}>{event.interestedCount}</Text>
               <Text style={styles.statLabel}>Interested</Text>
@@ -151,7 +152,7 @@ export const ManageEventScreen: React.FC = () => {
 
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="people" size={28} color="#6366F1" />
+                <Ionicons name="people" size={28} color={theme.colors.accent.primary} />
               </View>
               <Text style={styles.statValue}>50</Text>
               <Text style={styles.statLabel}>Capacity</Text>
@@ -165,7 +166,7 @@ export const ManageEventScreen: React.FC = () => {
             <View style={styles.detailCard}>
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <Ionicons name="calendar-outline" size={20} color="#B06579" />
+                  <Ionicons name="calendar-outline" size={20} color={theme.colors.accent.neon} />
                 </View>
                 <View style={styles.detailTextContainer}>
                   <Text style={styles.detailLabel}>Date & Time</Text>
@@ -184,7 +185,7 @@ export const ManageEventScreen: React.FC = () => {
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <Ionicons name="location-outline" size={20} color="#B06579" />
+                  <Ionicons name="location-outline" size={20} color={theme.colors.accent.neon} />
                 </View>
                 <View style={styles.detailTextContainer}>
                   <Text style={styles.detailLabel}>Location</Text>
@@ -196,7 +197,7 @@ export const ManageEventScreen: React.FC = () => {
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <Ionicons name="people-outline" size={20} color="#B06579" />
+                  <Ionicons name="people-outline" size={20} color={theme.colors.accent.neon} />
                 </View>
                 <View style={styles.detailTextContainer}>
                   <Text style={styles.detailLabel}>Organized By</Text>
@@ -214,7 +215,7 @@ export const ManageEventScreen: React.FC = () => {
               {registeredUsers.map((user) => (
                 <View key={user.id} style={styles.userCard}>
                   <View style={styles.userAvatar}>
-                    <Ionicons name="person" size={24} color="#B06579" />
+                    <Ionicons name="person" size={24} color={theme.colors.accent.neon} />
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{user.name}</Text>
@@ -247,7 +248,7 @@ export const ManageEventScreen: React.FC = () => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Event</Text>
               <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color="#1F2937" />
+                <Ionicons name="close" size={24} color={theme.colors.text.primary} />
               </TouchableOpacity>
             </View>
 
@@ -259,7 +260,7 @@ export const ManageEventScreen: React.FC = () => {
                   style={styles.dateTimePickerButton}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={20} color="#B06579" />
+                  <Ionicons name="calendar-outline" size={20} color={theme.colors.accent.neon} />
                   <Text style={styles.dateTimePickerText}>
                     {editedDate.toLocaleDateString('en-US', {
                       month: 'long',
@@ -290,7 +291,7 @@ export const ManageEventScreen: React.FC = () => {
                   style={styles.dateTimePickerButton}
                   onPress={() => setShowTimePicker(true)}
                 >
-                  <Ionicons name="time-outline" size={20} color="#B06579" />
+                  <Ionicons name="time-outline" size={20} color={theme.colors.accent.neon} />
                   <Text style={styles.dateTimePickerText}>
                     {editedTime.toLocaleTimeString('en-US', {
                       hour: 'numeric',
@@ -318,13 +319,13 @@ export const ManageEventScreen: React.FC = () => {
               <View style={styles.editSection}>
                 <Text style={styles.editLabel}>Location</Text>
                 <View style={styles.inputContainer}>
-                  <Ionicons name="location-outline" size={20} color="#B06579" style={styles.inputIcon} />
+                  <Ionicons name="location-outline" size={20} color={theme.colors.accent.neon} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     value={editedLocation}
                     onChangeText={setEditedLocation}
                     placeholder="Enter location"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={theme.colors.text.muted}
                   />
                 </View>
               </View>
@@ -333,13 +334,13 @@ export const ManageEventScreen: React.FC = () => {
               <View style={styles.editSection}>
                 <Text style={styles.editLabel}>Capacity</Text>
                 <View style={styles.inputContainer}>
-                  <Ionicons name="people-outline" size={20} color="#B06579" style={styles.inputIcon} />
+                  <Ionicons name="people-outline" size={20} color={theme.colors.accent.neon} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     value={editedCapacity}
                     onChangeText={setEditedCapacity}
                     placeholder="Maximum attendees"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={theme.colors.text.muted}
                     keyboardType="numeric"
                   />
                 </View>
@@ -351,7 +352,7 @@ export const ManageEventScreen: React.FC = () => {
                 onPress={handleSaveChanges}
               >
                 <LinearGradient
-                  colors={['#E372A1', '#CE678A', '#B06579']}
+                  colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                   style={styles.saveButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -368,10 +369,11 @@ export const ManageEventScreen: React.FC = () => {
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.chat,
   },
   header: {
     paddingTop: 50,
@@ -392,7 +394,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
   },
   editButton: {
     width: 40,
@@ -405,7 +407,7 @@ const styles = StyleSheet.create({
   banner: {
     width: SCREEN_WIDTH,
     height: 200,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.card,
   },
   bannerPlaceholder: {
     width: SCREEN_WIDTH,
@@ -423,7 +425,7 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 20,
     lineHeight: 32,
   },
@@ -434,17 +436,19 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: 18,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
   },
   statIconContainer: {
     marginBottom: 10,
@@ -452,13 +456,13 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 4,
     lineHeight: 30,
   },
   statLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -468,19 +472,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 12,
     lineHeight: 24,
   },
   detailCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: 18,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
   },
   detailRow: {
     flexDirection: 'row',
@@ -491,7 +497,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -500,113 +506,82 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '600',
     marginBottom: 4,
   },
   detailValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 2,
   },
   detailSubValue: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   detailDivider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 14,
+    backgroundColor: theme.colors.border,
+    marginVertical: 16,
   },
   registeredSection: {
     marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  sectionHeaderTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
-    lineHeight: 24,
-  },
-  countBadge: {
-    backgroundColor: '#FFF5F8',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B06579',
-    lineHeight: 16,
   },
   usersList: {
     gap: 10,
   },
   userCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: theme.colors.card,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF5F8',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 2,
+    color: theme.colors.text.primary,
   },
   userDetails: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    fontWeight: '500',
+    fontSize: 12,
+    color: theme.colors.text.muted,
   },
   aboutSection: {
-    marginBottom: 20,
+    marginBottom: 40,
   },
   description: {
-    fontSize: 15,
-    color: '#6B7280',
-    lineHeight: 24,
-    fontWeight: '400',
+    fontSize: 14,
+    color: theme.colors.text.muted,
+    lineHeight: 22,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(2,6,23,0.7)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 40,
-    maxHeight: '75%',
+    maxHeight: SCREEN_HEIGHT * 0.8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -614,69 +589,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
   },
   modalBody: {
     padding: 20,
-    paddingBottom: 0,
   },
   editSection: {
     marginBottom: 20,
   },
   editLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 10,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1F2937',
-    paddingVertical: 14,
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginBottom: 8,
   },
   dateTimePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    gap: 10,
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 14,
-    gap: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
   },
   dateTimePickerText: {
-    flex: 1,
     fontSize: 15,
-    color: '#1F2937',
     fontWeight: '500',
+    color: theme.colors.text.primary,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: 14,
+    paddingLeft: 44,
+    fontSize: 15,
+    color: theme.colors.text.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   saveButton: {
     borderRadius: 14,
     overflow: 'hidden',
     marginTop: 10,
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
   saveButtonGradient: {
     paddingVertical: 16,
@@ -684,9 +660,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.5,
+    color: theme.colors.white,
   },
 });

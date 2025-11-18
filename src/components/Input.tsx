@@ -40,7 +40,7 @@ export const Input: React.FC<InputProps> = ({ label, error, containerStyle, left
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor={theme.colors.neutral[400]}
+          placeholderTextColor={theme.colors.text.muted}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
@@ -58,22 +58,26 @@ const styles = StyleSheet.create({
   label: {
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
-    color: theme.colors.neutral[700],
+    color: theme.colors.text.secondary,
     marginBottom: theme.spacing.sm,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[50],
-    borderWidth: 1.5,
-    borderColor: theme.colors.neutral[200],
+    backgroundColor: theme.colors.glass.dark,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     paddingHorizontal: theme.spacing.lg,
     height: 52,
   },
   inputFocused: {
     borderColor: theme.colors.primary[500],
-    backgroundColor: theme.colors.white,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 6,
   },
   inputError: {
     borderColor: theme.colors.error.main,
@@ -84,7 +88,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: theme.fontSize.md,
-    color: theme.colors.neutral[900],
+    color: theme.colors.text.primary,
     padding: 0,
   },
   error: {

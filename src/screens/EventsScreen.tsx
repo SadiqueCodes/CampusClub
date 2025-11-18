@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { useNavigation } from '@react-navigation/native';
+import { theme } from '../theme';
 
 export const EventsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -15,7 +16,7 @@ export const EventsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
+        colors={theme.colors.gradients.create}
         style={styles.header}
       >
         <Text style={styles.headerTitle}>My Events</Text>
@@ -52,13 +53,13 @@ export const EventsScreen: React.FC = () => {
 
                 <View style={styles.eventStats}>
                   <View style={styles.statItem}>
-                    <Ionicons name="heart" size={16} color="#E372A1" />
+                    <Ionicons name="heart" size={16} color={theme.colors.accent.magenta} />
                     <Text style={styles.statText}>
                       {event.interestedCount} interested
                     </Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Ionicons name="location" size={16} color="#6B7280" />
+                    <Ionicons name="location" size={16} color={theme.colors.text.muted} />
                     <Text style={styles.statText}>{event.location}</Text>
                   </View>
                 </View>
@@ -74,7 +75,7 @@ export const EventsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.create,
   },
   header: {
     paddingTop: 50,
@@ -98,13 +99,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2D3436',
+    color: theme.colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     textAlign: 'center',
   },
   eventsList: {
@@ -112,16 +113,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eventCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E372A1',
+    backgroundColor: theme.colors.card,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 5,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -136,16 +137,16 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 4,
   },
   eventClub: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   eventDateBadge: {
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(91,99,255,0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   eventDate: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B06579',
+    color: theme.colors.accent.primary,
   },
   eventStats: {
     flexDirection: 'row',
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
 });

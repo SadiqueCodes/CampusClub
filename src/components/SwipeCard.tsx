@@ -13,6 +13,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from '../types';
+import { theme } from '../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -83,7 +84,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
         <View style={styles.cardInner}>
           {/* Profile Photo */}
           <LinearGradient
-            colors={['#E372A1', '#CE678A', '#B06579']}
+            colors={[theme.colors.primary[800], theme.colors.primary[600]]}
             style={styles.profilePhoto}
           >
             <View style={styles.avatarCircle}>
@@ -93,12 +94,12 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
 
           {/* Swipe Stamps */}
           <Animated.View style={[styles.likeStamp, likeOpacityStyle]}>
-            <Ionicons name="heart" size={32} color="#fff" />
+            <Ionicons name="heart" size={28} color="#0D9488" />
             <Text style={styles.stampText}>INVITE</Text>
           </Animated.View>
 
           <Animated.View style={[styles.nopeStamp, nopeOpacityStyle]}>
-            <Ionicons name="close" size={32} color="#fff" />
+            <Ionicons name="close" size={28} color="#FF5C7C" />
             <Text style={styles.stampText}>PASS</Text>
           </Animated.View>
 
@@ -114,14 +115,14 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="school" size={16} color="#B06579" />
+              <Ionicons name="school" size={16} color={theme.colors.secondary[300]} />
               <Text style={styles.major}>{user.major}</Text>
             </View>
 
             {user.interests.length > 0 && (
               <View style={styles.interestsSection}>
                 <View style={styles.interestsHeader}>
-                  <Ionicons name="heart" size={16} color="#B06579" />
+                  <Ionicons name="heart" size={16} color={theme.colors.primary[400]} />
                   <Text style={styles.interestsLabel}>Interests</Text>
                 </View>
                 <View style={styles.interestsTags}>
@@ -157,13 +158,15 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: theme.colors.card,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.45,
+    shadowRadius: 40,
+    elevation: 20,
     overflow: 'hidden',
   },
   profilePhoto: {
@@ -176,19 +179,16 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background.home,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.white,
   },
   avatarText: {
     fontSize: 48,
     fontWeight: '800',
-    color: '#B06579',
+    color: theme.colors.primary[100],
   },
   infoContainer: {
     padding: 20,
@@ -200,13 +200,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   name: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     flex: 1,
   },
   yearBadge: {
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(91,99,255,0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   yearText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B06579',
+    color: theme.colors.primary[200],
   },
   infoRow: {
     flexDirection: 'row',
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   major: {
     fontSize: 15,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '600',
   },
   interestsSection: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   interestsLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
   },
   interestsTags: {
     flexDirection: 'row',
@@ -247,17 +247,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   interestTag: {
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E372A1',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   interestText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#B06579',
+    color: theme.colors.text.secondary,
   },
   statsRow: {
     flexDirection: 'row',
@@ -269,48 +269,42 @@ const styles = StyleSheet.create({
   },
   statsText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   likeStamp: {
     position: 'absolute',
     top: 40,
     right: 30,
-    backgroundColor: '#10B981',
+    backgroundColor: 'rgba(56,189,248,0.15)',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
     transform: [{ rotate: '20deg' }],
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.secondary[300],
   },
   nopeStamp: {
     position: 'absolute',
     top: 40,
     left: 30,
-    backgroundColor: '#EF4444',
+    backgroundColor: 'rgba(255,92,124,0.18)',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
     transform: [{ rotate: '-20deg' }],
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#FF5C7C',
   },
   stampText: {
-    color: '#fff',
-    fontSize: 16,
+    color: theme.colors.white,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1,
   },

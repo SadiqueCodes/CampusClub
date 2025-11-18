@@ -52,10 +52,9 @@ export const Button: React.FC<ButtonProps> = ({
     borderRadius: theme.borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: disabled ? 0.6 : 1,
+    opacity: disabled ? 0.5 : 1,
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
-    ...theme.shadows.md,
   };
 
   const textStyle: TextStyle = {
@@ -73,10 +72,19 @@ export const Button: React.FC<ButtonProps> = ({
         style={style}
       >
         <LinearGradient
-          colors={[theme.colors.primary[600], theme.colors.primary[700]]}
+          colors={[theme.colors.primary[500], theme.colors.secondary[400]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={baseContainerStyle}
+          style={[
+            baseContainerStyle,
+            {
+              shadowColor: theme.colors.shadow,
+              shadowOffset: { width: 0, height: 15 },
+              shadowOpacity: 0.4,
+              shadowRadius: 30,
+              elevation: 12,
+            },
+          ]}
         >
           {loading ? (
             <ActivityIndicator color={theme.colors.white} />
@@ -93,25 +101,25 @@ export const Button: React.FC<ButtonProps> = ({
       backgroundColor: theme.colors.primary[600],
     },
     secondary: {
-      backgroundColor: theme.colors.neutral[100],
+      backgroundColor: theme.colors.glass.dark,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     outline: {
       backgroundColor: 'transparent',
       borderWidth: 1.5,
-      borderColor: theme.colors.primary[600],
-      ...theme.shadows.none,
+      borderColor: theme.colors.primary[500],
     },
     ghost: {
       backgroundColor: 'transparent',
-      ...theme.shadows.none,
     },
   };
 
   const textColors: Record<string, string> = {
     primary: theme.colors.white,
-    secondary: theme.colors.neutral[900],
-    outline: theme.colors.primary[600],
-    ghost: theme.colors.primary[600],
+    secondary: theme.colors.text.primary,
+    outline: theme.colors.primary[500],
+    ghost: theme.colors.text.primary,
   };
 
   return (

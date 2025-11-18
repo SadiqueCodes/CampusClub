@@ -82,6 +82,36 @@ export const theme = {
     normal: 300,
     slow: 500,
   },
+  effects: {
+    glow: {
+      cyan: {
+        shadowColor: colors.accent.neon,
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.45,
+        shadowRadius: 35,
+        elevation: 16,
+      },
+      purple: {
+        shadowColor: colors.primary[500],
+        shadowOffset: { width: 0, height: 18 },
+        shadowOpacity: 0.4,
+        shadowRadius: 32,
+        elevation: 14,
+      },
+    },
+    glass: {
+      card: {
+        backgroundColor: colors.glass.dark,
+        borderColor: colors.border,
+        borderWidth: 1,
+      },
+      pill: {
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderColor: 'rgba(255,255,255,0.18)',
+        borderWidth: 1,
+      },
+    },
+  },
 };
 
 export type Theme = typeof theme;

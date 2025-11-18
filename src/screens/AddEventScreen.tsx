@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore } from '../store';
 import { Club } from '../types';
+import { theme } from '../theme';
 
 export const AddEventScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -79,7 +80,7 @@ export const AddEventScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
+        colors={theme.colors.gradients.create}
         style={styles.header}
       >
         <TouchableOpacity
@@ -105,7 +106,7 @@ export const AddEventScreen: React.FC = () => {
             ) : (
               <View style={styles.posterPlaceholder}>
                 <View style={styles.uploadIconContainer}>
-                  <Ionicons name="image-outline" size={40} color="#B06579" />
+                  <Ionicons name="image-outline" size={40} color={theme.colors.accent.neon} />
                 </View>
                 <Text style={styles.uploadText}>Upload Event Poster</Text>
                 <Text style={styles.uploadSubtext}>Recommended: 16:9 ratio</Text>
@@ -148,7 +149,7 @@ export const AddEventScreen: React.FC = () => {
             style={styles.selectorButton}
             onPress={() => setShowClubSelector(true)}
           >
-            <Ionicons name="people-outline" size={20} color="#B06579" />
+            <Ionicons name="people-outline" size={20} color={theme.colors.accent.neon} />
             <Text style={[styles.selectorText, !selectedClub && styles.placeholderText]}>
               {selectedClub ? selectedClub.name : 'Select a club'}
             </Text>
@@ -173,7 +174,7 @@ export const AddEventScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.label}>Location</Text>
           <View style={styles.inputWithIcon}>
-            <Ionicons name="location-outline" size={20} color="#B06579" style={styles.inputIcon} />
+            <Ionicons name="location-outline" size={20} color={theme.colors.accent.neon} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, styles.inputWithPadding]}
               placeholder="Enter event location"
@@ -191,7 +192,7 @@ export const AddEventScreen: React.FC = () => {
             style={styles.dateTimeButton}
             onPress={() => setShowDatePicker(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color="#B06579" />
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.accent.neon} />
             <Text style={styles.dateTimeText}>
               {date.toLocaleDateString('en-US', {
                 month: 'long',
@@ -222,7 +223,7 @@ export const AddEventScreen: React.FC = () => {
             style={styles.dateTimeButton}
             onPress={() => setShowTimePicker(true)}
           >
-            <Ionicons name="time-outline" size={20} color="#B06579" />
+            <Ionicons name="time-outline" size={20} color={theme.colors.accent.neon} />
             <Text style={styles.dateTimeText}>
               {time.toLocaleTimeString('en-US', {
                 hour: 'numeric',
@@ -252,7 +253,7 @@ export const AddEventScreen: React.FC = () => {
           onPress={handleCreateEvent}
         >
           <LinearGradient
-            colors={['#E372A1', '#CE678A', '#B06579']}
+            colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
             style={styles.createButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -289,7 +290,7 @@ export const AddEventScreen: React.FC = () => {
                 >
                   <View style={styles.clubOptionContent}>
                     <View style={styles.clubIconContainer}>
-                      <Ionicons name="people" size={20} color="#B06579" />
+                    <Ionicons name="people" size={20} color={theme.colors.accent.neon} />
                     </View>
                     <View style={styles.clubInfo}>
                       <Text style={styles.clubOptionName}>{club.name}</Text>
@@ -297,7 +298,7 @@ export const AddEventScreen: React.FC = () => {
                     </View>
                   </View>
                   {selectedClub?.id === club.id && (
-                    <Ionicons name="checkmark-circle" size={24} color="#B06579" />
+                    <Ionicons name="checkmark-circle" size={24} color={theme.colors.accent.neon} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -312,7 +313,7 @@ export const AddEventScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.create,
   },
   header: {
     paddingTop: 50,
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
   },
   placeholder: {
     width: 40,
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 10,
   },
   posterUpload: {
@@ -356,9 +357,9 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     borderStyle: 'dashed',
   },
   posterImage: {
@@ -375,7 +376,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -383,21 +384,21 @@ const styles = StyleSheet.create({
   uploadText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 4,
   },
   uploadSubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     fontSize: 15,
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
   },
   textArea: {
     minHeight: 100,
@@ -417,29 +418,29 @@ const styles = StyleSheet.create({
     paddingLeft: 46,
   },
   dateTimeButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
   },
   dateTimeText: {
     fontSize: 15,
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     fontWeight: '500',
   },
   createButton: {
     marginTop: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowRadius: 20,
+    elevation: 8,
   },
   createButtonGradient: {
     paddingVertical: 18,
@@ -453,23 +454,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   selectorButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: theme.colors.border,
   },
   selectorText: {
     flex: 1,
     fontSize: 15,
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     fontWeight: '500',
   },
   placeholderText: {
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
   },
   modalOverlay: {
     flex: 1,
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
@@ -489,12 +490,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
   },
   clubList: {
     paddingHorizontal: 20,
@@ -505,7 +506,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.border,
   },
   clubOptionContent: {
     flexDirection: 'row',
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -527,11 +528,11 @@ const styles = StyleSheet.create({
   clubOptionName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     marginBottom: 2,
   },
   clubOptionType: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
   },
 });

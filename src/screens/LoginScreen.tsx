@@ -124,8 +124,8 @@ export const LoginScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Gradient Background */}
       <LinearGradient
-colors={['#B06579', '#CE678A', '#E372A1']}   
-     style={styles.gradient}
+        colors={theme.colors.gradients.auth}
+        style={styles.gradient}
       >
         {/* Beautiful Decorative Pattern Overlay */}
         <View style={styles.patternContainer}>
@@ -218,13 +218,13 @@ colors={['#B06579', '#CE678A', '#E372A1']}
               {/* First set of cards */}
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="people" size={36} color="#fff" />
@@ -232,22 +232,22 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Join Clubs</Text>
                   <Text style={styles.featureCardSubtitle}>Connect with students</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
 
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="calendar" size={36} color="#fff" />
@@ -255,22 +255,22 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Events</Text>
                   <Text style={styles.featureCardSubtitle}>Discover activities</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
 
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="chatbubbles" size={36} color="#fff" />
@@ -278,9 +278,9 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Chat</Text>
                   <Text style={styles.featureCardSubtitle}>Stay connected</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
@@ -288,13 +288,13 @@ colors={['#B06579', '#CE678A', '#E372A1']}
               {/* Duplicate set for seamless loop */}
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="people" size={36} color="#fff" />
@@ -302,22 +302,22 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Join Clubs</Text>
                   <Text style={styles.featureCardSubtitle}>Connect with students</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
 
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="calendar" size={36} color="#fff" />
@@ -325,22 +325,22 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Events</Text>
                   <Text style={styles.featureCardSubtitle}>Discover activities</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
 
               <View style={styles.featureCard}>
                 <LinearGradient
-                  colors={['#fff', '#FFF5F8', '#fff']}
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)']}
                   style={styles.featureCardGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
                   <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
+                    colors={[theme.colors.primary[500], theme.colors.accent.magenta, theme.colors.secondary[400]]}
                     style={styles.featureIconContainer}
                   >
                     <Ionicons name="chatbubbles" size={36} color="#fff" />
@@ -348,9 +348,9 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <Text style={styles.featureCardTitle}>Chat</Text>
                   <Text style={styles.featureCardSubtitle}>Stay connected</Text>
                   <View style={styles.decorativeDots}>
-                    <View style={[styles.dot, { backgroundColor: '#E372A1' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#CE678A' }]} />
-                    <View style={[styles.dot, { backgroundColor: '#B06579' }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.neon }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.colors.accent.magenta }]} />
                   </View>
                 </LinearGradient>
               </View>
@@ -396,7 +396,7 @@ colors={['#B06579', '#CE678A', '#E372A1']}
         <Svg width={SCREEN_WIDTH} height={100} style={styles.curve}>
           <Path
             d={`M0,50 Q${SCREEN_WIDTH * 0.25},0 ${SCREEN_WIDTH * 0.5},50 Q${SCREEN_WIDTH * 0.75},90 ${SCREEN_WIDTH},50 L${SCREEN_WIDTH},100 L0,100 Z`}
-            fill="white"
+            fill={theme.colors.background.auth}
           />
           <Path
             d={`M0,50 Q${SCREEN_WIDTH * 0.25},0 ${SCREEN_WIDTH * 0.5},50 Q${SCREEN_WIDTH * 0.75},90 ${SCREEN_WIDTH},50`}
@@ -442,11 +442,11 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Full Name</Text>
                     <View style={styles.inputWrapper}>
-                      <Ionicons name="person-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                      <Ionicons name="person-outline" size={20} color={theme.colors.text.muted} style={styles.inputIcon} />
                       <TextInput
                         style={styles.input}
                         placeholder="John Doe"
-                        placeholderTextColor="#DDD"
+                        placeholderTextColor={theme.colors.text.muted}
                         value={name}
                         onChangeText={setName}
                         autoCapitalize="words"
@@ -459,11 +459,11 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Email</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                    <Ionicons name="mail-outline" size={20} color={theme.colors.text.muted} style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="demo@email.com"
-                      placeholderTextColor="#DDD"
+                      placeholderTextColor={theme.colors.text.muted}
                       value={email}
                       onChangeText={setEmail}
                       keyboardType="email-address"
@@ -476,17 +476,17 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Password</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                    <Ionicons name="lock-closed-outline" size={20} color={theme.colors.text.muted} style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="Enter your password"
-                      placeholderTextColor="#DDD"
+                      placeholderTextColor={theme.colors.text.muted}
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={!showPassword}
                     />
                     <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#B2BEB5" />
+                      <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={theme.colors.text.muted} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -496,17 +496,17 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Confirm Password</Text>
                     <View style={styles.inputWrapper}>
-                      <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                      <Ionicons name="lock-closed-outline" size={20} color={theme.colors.text.muted} style={styles.inputIcon} />
                       <TextInput
                         style={styles.input}
                         placeholder="Confirm your password"
-                        placeholderTextColor="#DDD"
+                        placeholderTextColor={theme.colors.text.muted}
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
                         secureTextEntry={!showConfirmPassword}
                       />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                        <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#B2BEB5" />
+                        <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={20} color={theme.colors.text.muted} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -520,7 +520,7 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                       onPress={() => setRememberMe(!rememberMe)}
                     >
                       <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                        {rememberMe && <Ionicons name="checkmark" size={14} color="#E372A1" />}
+                      {rememberMe && <Ionicons name="checkmark" size={14} color={theme.colors.accent.neon} />}
                       </View>
                       <Text style={styles.rememberText}>Remember Me</Text>
                     </TouchableOpacity>
@@ -563,7 +563,7 @@ colors={['#B06579', '#CE678A', '#E372A1']}
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background.auth,
   },
   gradient: {
     position: 'absolute',
@@ -608,10 +608,12 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.7,
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.35,
+    shadowRadius: 30,
     elevation: 12,
   },
   featureCardGradient: {
@@ -627,23 +629,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: 'rgba(7,11,22,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   featureCardTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.white,
     textAlign: 'center',
     marginBottom: 8,
   },
   featureCardSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: 'rgba(248,250,252,0.7)',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -669,6 +669,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.7,
+    backgroundColor: theme.colors.background.auth,
   },
   curve: {
     position: 'absolute',
@@ -678,7 +679,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     paddingTop: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background.auth,
   },
   welcomeContent: {
     paddingHorizontal: 24,
@@ -687,12 +688,12 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 42,
     fontWeight: '700',
-    color: '#2D3436',
+    color: theme.colors.white,
     marginBottom: 16,
   },
   welcomeSubtitle: {
     fontSize: 15,
-    color: '#636E72',
+    color: 'rgba(248,250,252,0.7)',
     lineHeight: 22,
     marginBottom: 60,
   },
@@ -705,17 +706,17 @@ const styles = StyleSheet.create({
   },
   continueText: {
     fontSize: 16,
-    color: '#636E72',
+    color: theme.colors.text.muted,
     fontWeight: '500',
   },
   arrowCircle: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#E372A1',
+    backgroundColor: theme.colors.accent.magenta,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E372A1',
+    shadowColor: theme.colors.accent.magenta,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -738,13 +739,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#2D3436',
+    color: theme.colors.white,
     marginBottom: 8,
   },
   underline: {
     width: 60,
     height: 3,
-    backgroundColor: '#E372A1',
+    backgroundColor: theme.colors.accent.neon,
     borderRadius: 2,
   },
   inputContainer: {
@@ -753,18 +754,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2D3436',
+    color: theme.colors.text.secondary,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 48,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: 'rgba(5,11,24,0.8)',
   },
   inputIcon: {
     marginRight: 12,
@@ -772,7 +773,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: '#2D3436',
+    color: theme.colors.white,
   },
   eyeIcon: {
     padding: 4,
@@ -793,31 +794,35 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#E372A1',
+    borderColor: theme.colors.accent.neon,
     marginRight: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   rememberText: {
     fontSize: 13,
-    color: '#636E72',
+    color: theme.colors.text.muted,
   },
   forgotText: {
     fontSize: 13,
-    color: '#E372A1',
+    color: theme.colors.accent.neon,
     fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: '#E372A1',
+    backgroundColor: theme.colors.accent.magenta,
     height: 52,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    ...theme.shadows.sm,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 8,
   },
   loginButtonText: {
     fontSize: 16,
@@ -831,11 +836,11 @@ const styles = StyleSheet.create({
   },
   signupText: {
     fontSize: 14,
-    color: '#636E72',
+    color: theme.colors.text.muted,
   },
   signupLink: {
     fontSize: 14,
-    color: '#E372A1',
+    color: theme.colors.accent.neon,
     fontWeight: '600',
   },
 });

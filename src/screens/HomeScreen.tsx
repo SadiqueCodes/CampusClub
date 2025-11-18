@@ -176,7 +176,7 @@ export const HomeScreen: React.FC = () => {
       case 'Social':
         return ['#C86B8A', '#D98CA8'];
       default:
-        return ['#B06579', '#C67E8E'];
+        return ['#7DD3FC', '#C67E8E'];
     }
   };
 
@@ -253,7 +253,7 @@ export const HomeScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header with Gradient */}
       <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
+        colors={theme.colors.gradients.home}
         style={styles.headerGradient}
       >
         <View style={styles.header}>
@@ -326,12 +326,12 @@ export const HomeScreen: React.FC = () => {
 
                     <View style={styles.eventMetaContainer}>
                       <View style={styles.eventMetaItem}>
-                        <Ionicons name="time" size={14} color="#6B7280" />
+                        <Ionicons name="time" size={14} color="#94A3B8" />
                         <Text style={styles.eventMetaText}>{item.time}</Text>
                       </View>
                       <View style={styles.eventMetaDivider} />
                       <View style={styles.eventMetaItem}>
-                        <Ionicons name="location" size={14} color="#6B7280" />
+                        <Ionicons name="location" size={14} color="#94A3B8" />
                         <Text style={styles.eventMetaText} numberOfLines={1}>{item.location}</Text>
                       </View>
                     </View>
@@ -366,7 +366,7 @@ export const HomeScreen: React.FC = () => {
                           : 'headset'
                       }
                       size={28}
-                      color="#B06579"
+                      color="#7DD3FC"
                     />
                   </View>
                 )}
@@ -385,7 +385,7 @@ export const HomeScreen: React.FC = () => {
             {/* Add Item Card */}
             <TouchableOpacity style={styles.addItemCard}>
               <View style={styles.addItemIconContainer}>
-                <Ionicons name="add" size={32} color="#B06579" />
+                <Ionicons name="add" size={32} color="#7DD3FC" />
               </View>
             </TouchableOpacity>
           </View>
@@ -398,18 +398,18 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background.home,
   },
   headerGradient: {
     paddingTop: 50,
     paddingBottom: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 30,
+    elevation: 12,
   },
   header: {
     flexDirection: 'row',
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 28,
     fontFamily: 'Lobster_400Regular',
-    color: '#fff',
+    color: theme.colors.white,
     letterSpacing: 1,
   },
   userName: {
@@ -448,9 +448,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
+    paddingTop: 24,
   },
   section: {
     marginTop: 16,
+    paddingHorizontal: 20,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -460,13 +462,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
     marginBottom: 16,
   },
   seeMoreText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#E372A1',
+    color: '#5B63FF',
   },
   eventsHeaderRow: {
     flexDirection: 'row',
@@ -478,13 +479,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1F2937',
+    color: theme.colors.text.primary,
     letterSpacing: 0.5,
   },
   seeAllText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FF9B9B',
+    color: '#38BDF8',
   },
   clubsList: {
     paddingHorizontal: 20,
@@ -494,15 +495,15 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   clubCardGradient: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    height: 160,
+    height: 180,
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    elevation: 10,
     overflow: 'hidden',
   },
   patternOverlay: {
@@ -565,17 +566,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   applyButton: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(7,11,22,0.4)',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   applyButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2D3436',
+    color: theme.colors.white,
   },
   emptyClubs: {
     paddingHorizontal: 20,
@@ -584,65 +587,56 @@ const styles = StyleSheet.create({
   },
   emptyClubsText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#717DA6',
   },
   addButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E372A1',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.accent.neon,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: theme.colors.accent.neon,
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 20,
+    elevation: 6,
   },
   emptyState: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
+    backgroundColor: theme.colors.card,
     padding: 32,
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3436',
+    color: theme.colors.text.primary,
     marginTop: 12,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: theme.colors.text.muted,
     marginTop: 4,
   },
   eventsContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   eventCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E372A1',
+    backgroundColor: theme.colors.card,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   eventDateBadge: {
     width: 55,
     height: 55,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -651,13 +645,13 @@ const styles = StyleSheet.create({
   eventDateDay: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#B06579',
+    color: '#7DD3FC',
     lineHeight: 26,
   },
   eventDateMonth: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#E372A1',
+    color: '#5B63FF',
     letterSpacing: 0.5,
   },
   eventDetailsContainer: {
@@ -673,12 +667,12 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#F8FAFC',
     flex: 1,
     marginRight: 8,
   },
   eventClubBadge: {
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
@@ -686,7 +680,7 @@ const styles = StyleSheet.create({
   eventClubName: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#B06579',
+    color: '#7DD3FC',
   },
   eventMetaContainer: {
     flexDirection: 'row',
@@ -701,11 +695,11 @@ const styles = StyleSheet.create({
   eventMetaDivider: {
     width: 1,
     height: 16,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#1C2436',
   },
   eventMetaText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#94A3B8',
     fontWeight: '500',
   },
   marketplaceGrid: {
@@ -716,7 +710,7 @@ const styles = StyleSheet.create({
   },
   addItemCard: {
     width: '48%',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#0F1628',
     borderRadius: 16,
     padding: 14,
     shadowColor: '#000',
@@ -728,7 +722,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 160,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#1C2436',
     borderStyle: 'dashed',
   },
   addItemIconContainer: {
@@ -739,7 +733,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#1C2436',
     borderStyle: 'dashed',
   },
   marketplaceItem: {
@@ -753,19 +747,19 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#0F1628',
   },
   itemImage: {
     width: '100%',
     height: 100,
     borderRadius: 12,
     marginBottom: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#0F1628',
   },
   itemImagePlaceholder: {
     width: '100%',
     height: 100,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -777,16 +771,16 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#F8FAFC',
   },
   itemPrice: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#E372A1',
+    color: '#5B63FF',
   },
   sellerName: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#717DA6',
     fontWeight: '500',
   },
 });
