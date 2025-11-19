@@ -78,8 +78,15 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   headerTitle: {
     fontSize: 24,

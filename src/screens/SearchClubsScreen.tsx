@@ -56,17 +56,20 @@ export const SearchClubsScreen: React.FC = () => {
       >
         <Text style={styles.headerTitle}>Discover Clubs</Text>
         <Text style={styles.headerSubtitle}>Search your campus community</Text>
+      </LinearGradient>
+
+      <View style={styles.searchWrapper}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <Ionicons name="search" size={18} color="#9CA3AF" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by club, interest, or type"
-            placeholderTextColor="#D1D5DB"
+            placeholderTextColor="#9CA3AF"
             value={query}
             onChangeText={setQuery}
           />
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={styles.resultsList} showsVerticalScrollIndicator={false}>
         {filteredClubs.length === 0 ? (
@@ -146,18 +149,30 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: '500',
   },
+  searchWrapper: {
+    paddingHorizontal: 20,
+    marginTop: -24,
+    marginBottom: 12,
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#fff',
     borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    color: '#111827',
     fontSize: 15,
   },
   resultsList: {
