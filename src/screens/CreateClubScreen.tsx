@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Input, Card } from '../components';
+import { Input } from '../components';
 import { SwipeCard } from '../components/SwipeCard';
 import { theme } from '../theme';
 import { useStore } from '../store';
@@ -11,6 +12,7 @@ import { Club, ClubType, User } from '../types';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const CreateClubScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [clubName, setClubName] = useState('');
   const [clubType, setClubType] = useState<ClubType>('Academic');
@@ -18,7 +20,16 @@ export const CreateClubScreen: React.FC = () => {
   const [isSwipeMode, setIsSwipeMode] = useState(false);
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
 
-  const { currentUser, myClubs, addClub, addChat } = useStore();
+  const currentUser = useStore((state) => state.currentUser);
+  const addClub = useStore((state) => state.addClub);
+  const addChat = useStore((state) => state.addChat);
+  const chats = useStore((state) => state.chats);
+  const clubs = useStore((state) => state.clubs);
+
+  const myClubs = useMemo(() => {
+    if (!currentUser?.id) return [];
+    return clubs.filter((club) => club.memberIds.includes(currentUser.id));
+  }, [clubs, currentUser?.id]);
 
   // Mock users for swiping
   const [potentialMembers] = useState<User[]>([
@@ -71,6 +82,30 @@ export const CreateClubScreen: React.FC = () => {
 
   const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
 
+  const getClubChat = (clubId: string) => chats.find((chat) => chat.clubId === clubId);
+
+  const formatLastInteraction = (date?: Date) => {
+    if (!date) return 'Just created';
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+
+  const handleOpenChat = (club: Club) => {
+    const clubChat = getClubChat(club.id);
+    if (!clubChat) {
+      Alert.alert('Chat not ready', 'Please try again once the club chat finishes setting up.');
+      return;
+    }
+    navigation.navigate('ClubChatDetail', { chatId: clubChat.id });
+  };
+
   const handleCreateClub = () => {
     if (!clubName || !clubDescription || !currentUser) return;
 
@@ -96,6 +131,7 @@ export const CreateClubScreen: React.FC = () => {
       type: 'group',
       name: newClub.name,
       participantIds: [currentUser.id],
+      avatarEmoji: '👥',
       lastMessage: {
         id: '1',
         chatId: newClub.groupChatId,
@@ -111,6 +147,7 @@ export const CreateClubScreen: React.FC = () => {
 
     setShowCreateModal(false);
     setIsSwipeMode(true);
+    setCurrentProfileIndex(0);
     resetForm();
   };
 
@@ -266,55 +303,71 @@ export const CreateClubScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Clubs</Text>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => setShowCreateModal(true)}
-        >
-          <Ionicons name="add" size={24} color="#FF9B9B" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.clubsList}>
-        {myClubs.map((club) => (
-          <TouchableOpacity key={club.id} style={styles.clubCard}>
-            <LinearGradient
-              colors={['#FF9B9B', '#FFB4B4']}
-              style={styles.clubCardGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="people" size={28} color="#fff" />
-            </LinearGradient>
-            <View style={styles.clubInfo}>
-              <Text style={styles.clubCardTitle}>{club.name}</Text>
-              <View style={styles.clubStatsRow}>
-                <View style={styles.clubStatItem}>
-                  <Ionicons name="people-outline" size={14} color="#6B7280" />
-                  <Text style={styles.clubStatText}>{club.memberCount} members</Text>
-                </View>
-                <View style={styles.clubStatItem}>
-                  <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                  <Text style={styles.clubStatText}>{club.upcomingEvents} events</Text>
-                </View>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.addMembersButton}
-              onPress={() => setIsSwipeMode(true)}
-            >
-              <Ionicons name="person-add" size={20} color="#FF9B9B" />
-            </TouchableOpacity>
+      <LinearGradient
+        colors={['#E372A1', '#CE678A', '#B06579']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Club Chats</Text>
+            <Text style={styles.headerSubtitle}>Jump back into your communities</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
-        ))}
+        </View>
+      </LinearGradient>
+
+      <ScrollView contentContainerStyle={styles.clubsList} showsVerticalScrollIndicator={false}>
+        {myClubs.map((club) => {
+          const clubChat = getClubChat(club.id);
+          const previewText = clubChat?.lastMessage
+            ? `${clubChat.lastMessage.senderId === currentUser?.id ? 'You' : clubChat.lastMessage.senderName}: ${clubChat.lastMessage.text}`
+            : 'Start the conversation...';
+          const previewTime = formatLastInteraction(clubChat?.lastMessageTime);
+          const avatarLabel = clubChat?.avatarEmoji || club.name.charAt(0).toUpperCase();
+
+          return (
+            <TouchableOpacity
+              key={club.id}
+              style={styles.chatCard}
+              activeOpacity={0.85}
+              onPress={() => handleOpenChat(club)}
+            >
+              <View style={styles.chatAvatar}>
+                <Text style={styles.chatAvatarText}>{avatarLabel}</Text>
+              </View>
+              <View style={styles.chatInfo}>
+                <Text style={styles.chatName} numberOfLines={1}>{club.name}</Text>
+                <Text style={styles.chatSnippet} numberOfLines={1}>{previewText}</Text>
+              </View>
+              <View style={styles.chatMeta}>
+                <Text style={styles.chatTime}>{previewTime}</Text>
+                <TouchableOpacity
+                  style={styles.addMembersButton}
+                  onPress={(event: GestureResponderEvent) => {
+                    event.stopPropagation();
+                    setIsSwipeMode(true);
+                  }}
+                >
+                  <Ionicons name="person-add" size={16} color="#E372A1" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
 
         <TouchableOpacity
           style={styles.createNewButton}
           onPress={() => setShowCreateModal(true)}
         >
-          <Ionicons name="add-circle-outline" size={24} color="#FF9B9B" />
-          <Text style={styles.createNewButtonText}>Create New Club</Text>
+          <View style={styles.newClubIcon}>
+            <Ionicons name="add" size={18} color="#E372A1" />
+          </View>
+          <Text style={styles.createNewButtonText}>Create a New Club</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -382,21 +435,21 @@ const CreateClubModal: React.FC<{
 
               {showTypePicker && (
                 <View style={styles.pickerOptions}>
-                  {clubTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={styles.pickerOption}
-                      onPress={() => {
-                        setClubType(type);
-                        setShowTypePicker(false);
-                      }}
-                    >
-                      <Text style={styles.pickerOptionText}>{type}</Text>
-                      {clubType === type && (
-                        <Ionicons name="checkmark" size={20} color="#FF9B9B" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                      {clubTypes.map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={styles.pickerOption}
+                          onPress={() => {
+                            setClubType(type);
+                            setShowTypePicker(false);
+                          }}
+                        >
+                          <Text style={styles.pickerOptionText}>{type}</Text>
+                          {clubType === type && (
+                            <Ionicons name="checkmark" size={20} color="#E372A1" />
+                          )}
+                        </TouchableOpacity>
+                      ))}
                 </View>
               )}
             </View>
@@ -470,6 +523,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '500',
+    marginTop: 4,
+  },
   headerButton: {
     width: 44,
     height: 44,
@@ -536,79 +595,87 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   clubsList: {
-    padding: 20,
-    paddingBottom: 100,
+    padding: 16,
+    paddingBottom: 72,
+    gap: 12,
   },
-  clubCard: {
+  chatCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    gap: 12,
   },
-  clubCardGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+  chatAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FDF2F8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
-  clubInfo: {
+  chatAvatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#E372A1',
+  },
+  chatInfo: {
     flex: 1,
   },
-  clubCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2D3436',
-    marginBottom: 6,
+  chatName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
   },
-  clubStatsRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  clubStatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  clubStatText: {
+  chatSnippet: {
     fontSize: 13,
     color: '#6B7280',
-    marginLeft: 4,
+    marginTop: 2,
+  },
+  chatMeta: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  chatTime: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
   },
   addMembersButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF1F1',
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    backgroundColor: '#FDF2F8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   createNewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
     backgroundColor: '#fff',
+    gap: 10,
+  },
+  newClubIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    padding: 20,
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: '#FF9B9B',
-    borderStyle: 'dashed',
-    gap: 8,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   createNewButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#FF9B9B',
-    marginLeft: 8,
+    color: '#111827',
   },
   modalOverlay: {
     flex: 1,
@@ -702,12 +769,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF9B9B',
+    backgroundColor: '#E372A1',
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
     gap: 8,
-    shadowColor: '#FF9B9B',
+    shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

@@ -9,3 +9,4 @@ export { EventsScreen } from './EventsScreen';
 export { ChatScreen } from './ChatScreen';
 export { ChatDetailScreen } from './ChatDetailScreen';
 export { ProfileScreen } from './ProfileScreen';
+export { SearchClubsScreen } from './SearchClubsScreen';

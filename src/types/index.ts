@@ -73,6 +73,7 @@ export interface Chat {
   unreadCount: number;
   clubId?: string; // For club group chats
   marketplaceItemId?: string; // For marketplace chats
+  avatarEmoji?: string;
 }
 
 export interface Message {

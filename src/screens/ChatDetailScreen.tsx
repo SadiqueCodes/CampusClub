@@ -1,25 +1,74 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+  TouchableWithoutFeedback,
+  ScrollView,
+  Alert,
+  Dimensions,
+} from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { Message } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const ChatDetailScreen: React.FC = () => {
   const route = useRoute<any>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { chatId } = route.params;
+  const insets = useSafeAreaInsets();
 
-  const { chats, currentUser, getMessagesForChat, addMessage } = useStore();
+  const {
+    chats,
+    currentUser,
+    getMessagesForChat,
+    addMessage,
+    setChats,
+    clubs,
+    updateClub,
+    events,
+  } = useStore();
+
   const [messageText, setMessageText] = useState('');
+  const [showActions, setShowActions] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [showEventsModal, setShowEventsModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [pendingName, setPendingName] = useState('');
+  const [pendingDescription, setPendingDescription] = useState('');
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const moreButtonRef = useRef<TouchableOpacity | null>(null);
 
-  const chat = chats.find(c => c.id === chatId);
+  const chat = chats.find((c) => c.id === chatId);
   const messages = getMessagesForChat(chatId);
+  const club = chat?.clubId ? clubs.find((c) => c.id === chat.clubId) : undefined;
+  const members = useMemo(() => club?.memberIds || chat?.participantIds || [], [club, chat]);
+  const clubEvents = useMemo(() => (club ? events.filter((event) => event.clubId === club.id) : []), [events, club?.id]);
+  const emojiOptions = ['👥', '🎨', '💻', '⚽️', '🎭', '🎵', '📚', '🤝'];
+  const isLeader = !!(club && currentUser && club.leaderId === currentUser.id);
 
   useEffect(() => {
-    // Add some mock messages if empty
+    if (chat && !pendingName) {
+      setPendingName(chat.name || '');
+    }
+  }, [chat]);
+
+  useEffect(() => {
     if (messages.length === 0 && currentUser && chat) {
       const systemMessage: Message = {
         id: `msg_${Date.now()}`,
@@ -32,6 +81,14 @@ export const ChatDetailScreen: React.FC = () => {
       addMessage(chatId, systemMessage);
     }
   }, []);
+
+  if (!chat) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Chat not found</Text>
+      </View>
+    );
+  }
 
   const handleSendMessage = () => {
     if (!messageText.trim() || !currentUser) return;
@@ -48,7 +105,6 @@ export const ChatDetailScreen: React.FC = () => {
     addMessage(chatId, newMessage);
     setMessageText('');
 
-    // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -69,9 +125,7 @@ export const ChatDetailScreen: React.FC = () => {
     return (
       <View style={[styles.messageContainer, isOwnMessage ? styles.ownMessage : styles.otherMessage]}>
         <View style={[styles.messageBubble, isOwnMessage ? styles.ownBubble : styles.otherBubble]}>
-          {!isOwnMessage && (
-            <Text style={styles.senderName}>{item.senderName}</Text>
-          )}
+          {!isOwnMessage && <Text style={styles.senderName}>{item.senderName}</Text>}
           <Text style={[styles.messageText, isOwnMessage ? styles.ownMessageText : styles.otherMessageText]}>
             {item.text}
           </Text>
@@ -83,36 +137,192 @@ export const ChatDetailScreen: React.FC = () => {
     );
   };
 
-  if (!chat) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Chat not found</Text>
-      </View>
+  const closeAllModals = () => {
+    setShowActions(false);
+    setShowMembersModal(false);
+    setShowRenameModal(false);
+    setIsEditingDescription(false);
+    setShowDescriptionModal(false);
+    setShowEventsModal(false);
+    setShowAvatarModal(false);
+    setMenuPosition(null);
+  };
+
+  const renderMemberName = (memberId: string) => {
+    if (club?.leaderId === memberId) {
+      const leaderLabel = club.leaderName || 'Club Lead';
+      const suffix = currentUser?.id === memberId ? ' (You • Lead)' : ' (Lead)';
+      return `${leaderLabel}${suffix}`;
+    }
+    if (memberId === currentUser?.id && currentUser) {
+      return `${currentUser.name} (You)`;
+    }
+    return `Member ${memberId}`;
+  };
+
+  const updateChatParticipants = (updatedMembers: string[]) => {
+    setChats(
+      chats.map((c) =>
+        c.id === chat.id
+          ? {
+              ...c,
+              participantIds: updatedMembers,
+            }
+          : c
+      )
     );
-  }
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    if (!club || club.leaderId === memberId) return;
+    const updatedMembers = club.memberIds.filter((id) => id !== memberId);
+    updateClub(club.id, {
+      memberIds: updatedMembers,
+      memberCount: updatedMembers.length,
+    });
+    updateChatParticipants(updatedMembers);
+  };
+
+  const handleExitClub = () => {
+    if (!club || !currentUser) return;
+    if (club.leaderId === currentUser.id && club.memberIds.length > 1) {
+      Alert.alert('Transfer leadership', 'Assign a new leader before leaving the club.');
+      return;
+    }
+    const updatedMembers = club.memberIds.filter((id) => id !== currentUser.id);
+    updateClub(club.id, {
+      memberIds: updatedMembers,
+      memberCount: updatedMembers.length,
+    });
+    updateChatParticipants(updatedMembers);
+    navigation.goBack();
+  };
+
+  const handleRenameClub = () => {
+    if (!club || !pendingName.trim()) return;
+    const name = pendingName.trim();
+    updateClub(club.id, { name });
+    setChats(
+      chats.map((c) =>
+        c.id === chat.id
+          ? {
+              ...c,
+              name,
+            }
+          : c
+      )
+    );
+    setShowRenameModal(false);
+  };
+
+  const handleUpdateDescription = () => {
+    if (!club) return;
+    updateClub(club.id, { description: pendingDescription.trim() });
+    setIsEditingDescription(false);
+    setShowDescriptionModal(false);
+  };
+
+  const handleSelectAvatar = (emoji: string) => {
+    setChats(
+      chats.map((c) =>
+        c.id === chat.id
+          ? {
+              ...c,
+              avatarEmoji: emoji,
+            }
+          : c
+      )
+    );
+    setShowAvatarModal(false);
+  };
+
+  const actionItems = [
+    {
+      label: 'View description',
+      visible: chat.type === 'group',
+      onPress: () => {
+        setShowActions(false);
+        setPendingDescription(club?.description || '');
+        setIsEditingDescription(false);
+        setShowDescriptionModal(true);
+      },
+    },
+    {
+      label: 'View members',
+      visible: chat.type === 'group',
+      onPress: () => {
+        setShowActions(false);
+        setShowMembersModal(true);
+      },
+    },
+    {
+      label: 'Change club name',
+      visible: chat.type === 'group' && isLeader,
+      onPress: () => {
+        setShowActions(false);
+        setShowRenameModal(true);
+      },
+    },
+    {
+      label: 'Club events',
+      visible: chat.type === 'group',
+      onPress: () => {
+        setShowActions(false);
+        setShowEventsModal(true);
+      },
+    },
+    {
+      label: 'Exit club',
+      visible: chat.type === 'group' && !!currentUser,
+      onPress: () => {
+        setShowActions(false);
+        handleExitClub();
+      },
+    },
+  ].filter((item) => item.visible);
+
+  const shouldUseKeyboardAvoiding = Platform.OS === 'ios';
+  const headerAvatarLabel = chat.avatarEmoji || (chat.name ? chat.name.charAt(0).toUpperCase() : '👥');
+  const formatEventDate = (date?: Date) =>
+    date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      behavior={shouldUseKeyboardAvoiding ? 'padding' : 'height'}
+      keyboardVerticalOffset={shouldUseKeyboardAvoiding ? insets.top : 0}
     >
-      <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
-        style={styles.headerGradient}
-      >
+      <LinearGradient colors={['#E372A1', '#CE678A', '#B06579']} style={styles.headerGradient}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.groupAvatar} onPress={() => setShowAvatarModal(true)}>
+              <Text style={styles.groupAvatarText}>{headerAvatarLabel}</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'John Doe'}</Text>
+            <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'Direct Chat'}</Text>
             <Text style={styles.headerSubtitle}>
               {chat.type === 'group' ? `${chat.participantIds.length} members` : 'Active now'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+          <TouchableOpacity
+            ref={moreButtonRef}
+            style={styles.moreButton}
+            onPress={() => {
+              if (moreButtonRef.current) {
+                moreButtonRef.current.measureInWindow((x, y, width, height) => {
+                  setMenuPosition({ x, y, width, height });
+                  setShowActions(true);
+                });
+              } else {
+                setShowActions(true);
+              }
+            }}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -127,13 +337,18 @@ export const ChatDetailScreen: React.FC = () => {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <View style={styles.inputContainer}>
+      <View
+        style={[
+          styles.inputContainer,
+          { paddingBottom: 8 + (insets.bottom > 0 ? insets.bottom - 6 : 0) },
+        ]}
+      >
         <TouchableOpacity style={styles.attachButton}>
-          <Ionicons name="add-circle" size={28} color="#B06579" />
+          <Ionicons name="add-circle" size={22} color="#B06579" />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
-          placeholder="Type a message..."
+          placeholder="Message"
           placeholderTextColor="#9CA3AF"
           value={messageText}
           onChangeText={setMessageText}
@@ -145,9 +360,206 @@ export const ChatDetailScreen: React.FC = () => {
           onPress={handleSendMessage}
           disabled={!messageText.trim()}
         >
-          <Ionicons name="send" size={20} color="#fff" />
+          <Ionicons name="send" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      <Modal visible={showActions} transparent animationType="fade">
+        <TouchableWithoutFeedback
+          onPress={() => {
+            setShowActions(false);
+            setMenuPosition(null);
+          }}
+        >
+          <View style={styles.popoverOverlay} />
+        </TouchableWithoutFeedback>
+        {menuPosition && (
+          <View
+            style={[
+              styles.popoverMenu,
+              {
+                top: menuPosition.y + menuPosition.height + 8,
+                left: Math.min(
+                  Math.max(menuPosition.x + menuPosition.width - 180, 16),
+                  SCREEN_WIDTH - 180 - 16
+                ),
+              },
+            ]}
+          >
+            {actionItems.length === 0 ? (
+              <View style={styles.popoverItem}>
+                <Text style={styles.popoverItemText}>No actions available</Text>
+              </View>
+            ) : (
+              actionItems.map((action) => (
+                <TouchableOpacity key={action.label} style={styles.popoverItem} onPress={action.onPress}>
+                  <Text style={styles.popoverItemText}>{action.label}</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+      </Modal>
+
+      <Modal visible={showMembersModal} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={closeAllModals}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.membersModal}>
+          <Text style={styles.modalTitle}>Members</Text>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+            {members.map((memberId) => {
+              const label = renderMemberName(memberId);
+              const initial = label.trim().charAt(0).toUpperCase();
+              return (
+                <View key={memberId} style={styles.memberRow}>
+                  <View style={styles.memberInfo}>
+                    <View style={styles.memberAvatar}>
+                      <Text style={styles.memberAvatarText}>{initial}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.memberName}>{label}</Text>
+                      {club?.leaderId === memberId && <Text style={styles.memberRole}>Club lead</Text>}
+                    </View>
+                  </View>
+                  {isLeader && memberId !== currentUser?.id && memberId !== club?.leaderId && (
+                    <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveMember(memberId)}>
+                      <Text style={styles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+          <TouchableOpacity style={styles.modalCloseButton} onPress={closeAllModals}>
+            <Text style={styles.modalCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal visible={showRenameModal} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={closeAllModals}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.renameModal}>
+          <Text style={styles.modalTitle}>Rename club</Text>
+          <TextInput
+            style={styles.renameInput}
+            value={pendingName}
+            onChangeText={setPendingName}
+            placeholder="Club name"
+            placeholderTextColor="#9CA3AF"
+          />
+          <View style={styles.renameActions}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={closeAllModals}>
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryButton, !pendingName.trim() && styles.primaryButtonDisabled]}
+              onPress={handleRenameClub}
+              disabled={!pendingName.trim()}
+            >
+              <Text style={styles.primaryButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEventsModal} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={closeAllModals}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.eventsModal}>
+          <Text style={styles.modalTitle}>Club events</Text>
+          {clubEvents.length === 0 ? (
+            <Text style={styles.emptyEventsText}>No events have been scheduled yet.</Text>
+          ) : (
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              {clubEvents.map((event) => (
+                <View key={event.id} style={styles.eventCard}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <Text style={styles.eventDate}>{formatEventDate(event.date)}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+          <TouchableOpacity style={styles.modalCloseButton} onPress={closeAllModals}>
+            <Text style={styles.modalCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal visible={showDescriptionModal} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={closeAllModals}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.descriptionModal}>
+          <Text style={styles.modalTitle}>Club description</Text>
+          {isEditingDescription && isLeader ? (
+            <TextInput
+              style={[styles.renameInput, styles.descriptionInput]}
+              value={pendingDescription}
+              onChangeText={setPendingDescription}
+              placeholder="Tell members about this club"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          ) : (
+            <Text style={styles.descriptionBodyText}>
+              {pendingDescription.trim() ? pendingDescription : 'No description yet'}
+            </Text>
+          )}
+          <View style={styles.descriptionActions}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={closeAllModals}>
+              <Text style={styles.secondaryButtonText}>Close</Text>
+            </TouchableOpacity>
+            {isLeader && (
+              isEditingDescription ? (
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    !pendingDescription.trim() && styles.primaryButtonDisabled,
+                  ]}
+                  onPress={handleUpdateDescription}
+                  disabled={!pendingDescription.trim()}
+                >
+                  <Text style={styles.primaryButtonText}>Save</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => setIsEditingDescription(true)}
+                >
+                  <Text style={styles.primaryButtonText}>Edit</Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showAvatarModal} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={closeAllModals}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.avatarModal}>
+          <Text style={styles.modalTitle}>Choose group icon</Text>
+          <View style={styles.emojiGrid}>
+            {emojiOptions.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={styles.emojiOption}
+                onPress={() => handleSelectAvatar(emoji)}
+              >
+                <Text style={styles.emojiText}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -158,22 +570,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   headerGradient: {
-    paddingTop: 50,
-    paddingBottom: 12,
+    paddingTop: 48,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    gap: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+  },
+  groupAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupAvatarText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '700',
   },
   headerInfo: {
     flex: 1,
@@ -182,24 +619,52 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+    marginTop: 2,
   },
   moreButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  popoverMenu: {
+    position: 'absolute',
+    width: 180,
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  popoverItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  popoverOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   messagesList: {
     padding: 16,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   messageContainer: {
     marginBottom: 12,
@@ -213,7 +678,7 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     borderRadius: 16,
-    padding: 12,
+    padding: 10,
   },
   ownBubble: {
     backgroundColor: '#E372A1',
@@ -222,94 +687,335 @@ const styles = StyleSheet.create({
   otherBubble: {
     backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   senderName: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
     color: '#6B7280',
     marginBottom: 4,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
-    marginBottom: 4,
   },
   ownMessageText: {
     color: '#fff',
   },
   otherMessageText: {
-    color: '#1F2937',
+    color: '#111827',
   },
   messageTime: {
     fontSize: 11,
+    marginTop: 6,
   },
   ownMessageTime: {
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'right',
+    color: 'rgba(255,255,255,0.9)',
+    alignSelf: 'flex-end',
   },
   otherMessageTime: {
     color: '#9CA3AF',
   },
   systemMessageContainer: {
-    alignItems: 'center',
-    marginVertical: 16,
+    alignSelf: 'center',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginVertical: 12,
   },
   systemMessageText: {
     fontSize: 12,
+    color: '#4B5563',
+  },
+  errorText: {
+    fontSize: 16,
     color: '#9CA3AF',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
+    textAlign: 'center',
+    marginTop: 40,
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 100,
+    alignItems: 'flex-end',
     backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#E5E7EB',
   },
   attachButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   input: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1F2937',
     maxHeight: 100,
+    minHeight: 36,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: '#111827',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   sendButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
   },
   sendButtonActive: {
     backgroundColor: '#E372A1',
   },
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-    marginTop: 40,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  membersModal: {
+    position: 'absolute',
+    top: '20%',
+    left: 24,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#E372A1',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#E372A1',
+  },
+  memberName: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  memberRole: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  removeButton: {
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  removeButtonText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  modalCloseButton: {
+    marginTop: 16,
+    alignSelf: 'flex-end',
+  },
+  modalCloseText: {
+    fontSize: 14,
+    color: '#E372A1',
+    fontWeight: '600',
+  },
+  renameModal: {
+    position: 'absolute',
+    top: '28%',
+    left: 24,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+  },
+  descriptionModal: {
+    position: 'absolute',
+    top: '25%',
+    left: 24,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  eventsModal: {
+    position: 'absolute',
+    top: '25%',
+    left: 24,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  renameInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#111827',
+    marginTop: 12,
+  },
+  descriptionInput: {
+    minHeight: 120,
+  },
+  descriptionBodyText: {
+    fontSize: 14,
+    color: '#111827',
+    lineHeight: 22,
+    marginTop: 12,
+  },
+  descriptionActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 20,
+  },
+  eventCard: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  eventTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  eventDate: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  emptyEventsText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
+  },
+  avatarModal: {
+    position: 'absolute',
+    top: '28%',
+    left: 24,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 16,
+  },
+  emojiOption: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiText: {
+    fontSize: 24,
+  },
+  renameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 16,
+  },
+  secondaryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  primaryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#E372A1',
+  },
+  primaryButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+  },
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

@@ -10,16 +10,16 @@ import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { ManageEventScreen } from '../screens/ManageEventScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { CreateClubScreen } from '../screens/CreateClubScreen';
-import { ChatScreen } from '../screens/ChatScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { SearchClubsScreen } from '../screens/SearchClubsScreen';
 import { theme } from '../theme';
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const EventsStack = createNativeStackNavigator();
-const ChatStack = createNativeStackNavigator();
 const ClubsStack = createNativeStackNavigator();
+const SearchStack = createNativeStackNavigator();
 
 const HomeStackNavigator: React.FC = () => {
   return (
@@ -40,20 +40,20 @@ const EventsStackNavigator: React.FC = () => {
   );
 };
 
-const ChatStackNavigator: React.FC = () => {
-  return (
-    <ChatStack.Navigator screenOptions={{ headerShown: false }}>
-      <ChatStack.Screen name="ChatList" component={ChatScreen} />
-      <ChatStack.Screen name="ChatDetail" component={ChatDetailScreen} />
-    </ChatStack.Navigator>
-  );
-};
-
 const ClubsStackNavigator: React.FC = () => {
   return (
     <ClubsStack.Navigator screenOptions={{ headerShown: false }}>
       <ClubsStack.Screen name="CreateClub" component={CreateClubScreen} />
+      <ClubsStack.Screen name="ClubChatDetail" component={ChatDetailScreen} />
     </ClubsStack.Navigator>
+  );
+};
+
+const SearchStackNavigator: React.FC = () => {
+  return (
+    <SearchStack.Navigator screenOptions={{ headerShown: false }}>
+      <SearchStack.Screen name="SearchClubs" component={SearchClubsScreen} />
+    </SearchStack.Navigator>
   );
 };
 
@@ -85,12 +85,12 @@ export const TabNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen
-        name="Chat"
-        component={ChatStackNavigator}
+        name="Search"
+        component={SearchStackNavigator}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+              name={focused ? 'search' : 'search-outline'}
               size={24}
               color={color}
             />
