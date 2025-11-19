@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -338,7 +338,11 @@ export const CreateClubScreen: React.FC = () => {
               onPress={() => handleOpenChat(club)}
             >
               <View style={styles.chatAvatar}>
-                <Text style={styles.chatAvatarText}>{avatarLabel}</Text>
+                {clubChat?.avatarImage ? (
+                  <Image source={{ uri: clubChat.avatarImage }} style={styles.chatAvatarImage} />
+                ) : (
+                  <Text style={styles.chatAvatarText}>{avatarLabel}</Text>
+                )}
               </View>
               <View style={styles.chatInfo}>
                 <Text style={styles.chatName} numberOfLines={1}>{club.name}</Text>
@@ -360,15 +364,6 @@ export const CreateClubScreen: React.FC = () => {
           );
         })}
 
-        <TouchableOpacity
-          style={styles.createNewButton}
-          onPress={() => setShowCreateModal(true)}
-        >
-          <View style={styles.newClubIcon}>
-            <Ionicons name="add" size={18} color="#E372A1" />
-          </View>
-          <Text style={styles.createNewButtonText}>Create a New Club</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <CreateClubModal
@@ -618,6 +613,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chatAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
   chatAvatarText: {
     fontSize: 18,
     fontWeight: '700',
@@ -652,30 +652,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDF2F8',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  createNewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    backgroundColor: '#fff',
-    gap: 10,
-  },
-  newClubIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FDF2F8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createNewButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
   },
   modalOverlay: {
     flex: 1,

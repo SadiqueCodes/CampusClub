@@ -74,6 +74,7 @@ export interface Chat {
   clubId?: string; // For club group chats
   marketplaceItemId?: string; // For marketplace chats
   avatarEmoji?: string;
+  avatarImage?: string;
 }
 
 export interface Message {

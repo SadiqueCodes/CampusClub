@@ -13,7 +13,9 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +24,7 @@ import { Message } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const emojiOptions = ['👥', '🎨', '💻', '⚽️', '🎭', '🎵', '📚'];
 
 export const ChatDetailScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -59,7 +62,6 @@ export const ChatDetailScreen: React.FC = () => {
   const club = chat?.clubId ? clubs.find((c) => c.id === chat.clubId) : undefined;
   const members = useMemo(() => club?.memberIds || chat?.participantIds || [], [club, chat]);
   const clubEvents = useMemo(() => (club ? events.filter((event) => event.clubId === club.id) : []), [events, club?.id]);
-  const emojiOptions = ['👥', '🎨', '💻', '⚽️', '🎭', '🎵', '📚', '🤝'];
   const isLeader = !!(club && currentUser && club.leaderId === currentUser.id);
 
   useEffect(() => {
@@ -229,10 +231,40 @@ export const ChatDetailScreen: React.FC = () => {
           ? {
               ...c,
               avatarEmoji: emoji,
+              avatarImage: undefined,
             }
           : c
       )
     );
+    setShowAvatarModal(false);
+  };
+
+  const handleUploadAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Allow photo access to upload a group image.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets?.length) {
+      const uri = result.assets[0].uri;
+      setChats(
+        chats.map((c) =>
+          c.id === chat.id
+            ? {
+                ...c,
+                avatarImage: uri,
+                avatarEmoji: undefined,
+              }
+            : c
+        )
+      );
+    }
     setShowAvatarModal(false);
   };
 
@@ -282,9 +314,20 @@ export const ChatDetailScreen: React.FC = () => {
   ].filter((item) => item.visible);
 
   const shouldUseKeyboardAvoiding = Platform.OS === 'ios';
-  const headerAvatarLabel = chat.avatarEmoji || (chat.name ? chat.name.charAt(0).toUpperCase() : '👥');
   const formatEventDate = (date?: Date) =>
     date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+  const renderGroupAvatar = () => {
+    if (chat.avatarImage) {
+      return <Image source={{ uri: chat.avatarImage }} style={styles.groupAvatarImage} />;
+    }
+    const emoji = chat.avatarEmoji || (chat.name ? chat.name.charAt(0).toUpperCase() : '👥');
+    return (
+      <View style={styles.groupAvatarCircle}>
+        <Text style={styles.groupAvatarEmoji}>{emoji}</Text>
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -298,8 +341,8 @@ export const ChatDetailScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.groupAvatar} onPress={() => setShowAvatarModal(true)}>
-              <Text style={styles.groupAvatarText}>{headerAvatarLabel}</Text>
+            <TouchableOpacity onPress={() => setShowAvatarModal(true)}>
+              {renderGroupAvatar()}
             </TouchableOpacity>
           </View>
           <View style={styles.headerInfo}>
@@ -557,6 +600,9 @@ export const ChatDetailScreen: React.FC = () => {
                 <Text style={styles.emojiText}>{emoji}</Text>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity style={styles.emojiOption} onPress={handleUploadAvatar}>
+              <Ionicons name="add" size={24} color="#E372A1" />
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -599,7 +645,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupAvatar: {
+  groupAvatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -607,10 +653,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupAvatarText: {
+  groupAvatarEmoji: {
     fontSize: 18,
     color: '#fff',
     fontWeight: '700',
+  },
+  groupAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   headerInfo: {
     flex: 1,
@@ -973,19 +1024,20 @@ const styles = StyleSheet.create({
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
     marginTop: 16,
   },
   emojiOption: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: '22%',
+    aspectRatio: 1,
+    borderRadius: 18,
     backgroundColor: '#FDF2F8',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   emojiText: {
-    fontSize: 24,
+    fontSize: 26,
   },
   renameActions: {
     flexDirection: 'row',
