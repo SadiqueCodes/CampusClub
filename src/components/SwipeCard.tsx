@@ -77,6 +77,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
     return { opacity };
   });
 
+  const topInterests = user.interests.slice(0, 3);
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.card, animatedStyle]}>
@@ -118,28 +120,28 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
               <Text style={styles.major}>{user.major}</Text>
             </View>
 
-            {user.interests.length > 0 && (
-              <View style={styles.interestsSection}>
-                <View style={styles.interestsHeader}>
-                  <Ionicons name="heart" size={16} color="#B06579" />
-                  <Text style={styles.interestsLabel}>Interests</Text>
-                </View>
-                <View style={styles.interestsTags}>
-                  {user.interests.slice(0, 4).map((interest, index) => (
-                    <View key={index} style={styles.interestTag}>
-                      <Text style={styles.interestText}>{interest}</Text>
-                    </View>
-                  ))}
-                </View>
+            <Text style={styles.bioText}>{user.collegeName}</Text>
+
+            {topInterests.length > 0 && (
+              <View style={styles.tagRow}>
+                {topInterests.map((interest) => (
+                  <View key={interest} style={styles.tagChip}>
+                    <Text style={styles.tagChipText}>{interest}</Text>
+                  </View>
+                ))}
               </View>
             )}
 
             {user.clubsJoined.length > 0 && (
               <View style={styles.statsRow}>
-                <Ionicons name="people" size={16} color="#6B7280" />
-                <Text style={styles.statsText}>{user.clubsJoined.length} clubs joined</Text>
-                <Ionicons name="calendar" size={16} color="#6B7280" style={styles.statsIcon} />
-                <Text style={styles.statsText}>{user.eventsAttended} events attended</Text>
+                <View style={styles.statBubble}>
+                  <Ionicons name="people" size={14} color="#fff" />
+                  <Text style={styles.statBubbleText}>{user.clubsJoined.length} clubs</Text>
+                </View>
+                <View style={styles.statBubble}>
+                  <Ionicons name="calendar" size={14} color="#fff" />
+                  <Text style={styles.statBubbleText}>{user.eventsAttended} events</Text>
+                </View>
               </View>
             )}
           </View>
@@ -151,8 +153,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
 
 const styles = StyleSheet.create({
   card: {
-    width: SCREEN_WIDTH * 0.9,
-    height: 550,
+    width: SCREEN_WIDTH * 0.85,
+    height: 420,
     position: 'absolute',
   },
   cardInner: {
@@ -168,14 +170,14 @@ const styles = StyleSheet.create({
   },
   profilePhoto: {
     width: '100%',
-    height: 280,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -186,18 +188,18 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   avatarText: {
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: '800',
     color: '#B06579',
   },
   infoContainer: {
-    padding: 20,
+    padding: 16,
   },
   nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   name: {
     fontSize: 24,
@@ -220,61 +222,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 6,
   },
   major: {
     fontSize: 15,
     color: '#6B7280',
     fontWeight: '600',
   },
-  interestsSection: {
-    marginBottom: 16,
+  bioText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 8,
   },
-  interestsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-  },
-  interestsLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  interestsTags: {
+  tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 12,
   },
-  interestTag: {
-    backgroundColor: '#FFF5F8',
+  tagChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E372A1',
+    borderRadius: 14,
+    backgroundColor: '#FFF5F8',
   },
-  interestText: {
+  tagChipText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#B06579',
   },
   statsRow: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  statBubble: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#B06579',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
-  statsIcon: {
-    marginLeft: 12,
-  },
-  statsText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
+  statBubbleText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
   },
   likeStamp: {
     position: 'absolute',
-    top: 40,
+    top: 20,
     right: 30,
     backgroundColor: '#10B981',
     paddingHorizontal: 20,
@@ -292,7 +289,7 @@ const styles = StyleSheet.create({
   },
   nopeStamp: {
     position: 'absolute',
-    top: 40,
+    top: 20,
     left: 30,
     backgroundColor: '#EF4444',
     paddingHorizontal: 20,

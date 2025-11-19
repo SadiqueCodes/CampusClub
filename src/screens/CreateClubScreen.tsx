@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +9,7 @@ import { theme } from '../theme';
 import { useStore } from '../store';
 import { Club, ClubType, User } from '../types';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const CreateClubScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -19,6 +19,11 @@ export const CreateClubScreen: React.FC = () => {
   const [clubDescription, setClubDescription] = useState('');
   const [isSwipeMode, setIsSwipeMode] = useState(false);
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
+  const [showInterestMenu, setShowInterestMenu] = useState(false);
+  const [filterMenuCoords, setFilterMenuCoords] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const filterButtonRef = useRef<TouchableOpacity | null>(null);
 
   const currentUser = useStore((state) => state.currentUser);
   const addClub = useStore((state) => state.addClub);
@@ -81,6 +86,26 @@ export const CreateClubScreen: React.FC = () => {
   ]);
 
   const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
+
+  const availableInterests = useMemo(() => {
+    const interestSet = new Set<string>();
+    potentialMembers.forEach((member) => {
+      member.interests.forEach((interest) => interestSet.add(interest));
+    });
+    return Array.from(interestSet).slice(0, 8);
+  }, [potentialMembers]);
+
+  const filteredMembers = useMemo(() => {
+    return potentialMembers.filter((member) => {
+      const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesInterest = selectedInterest ? member.interests.includes(selectedInterest) : true;
+      return matchesSearch && matchesInterest;
+    });
+  }, [potentialMembers, searchQuery, selectedInterest]);
+
+  useEffect(() => {
+    setCurrentProfileIndex(0);
+  }, [searchQuery, selectedInterest]);
 
   const getClubChat = (clubId: string) => chats.find((chat) => chat.clubId === clubId);
 
@@ -158,14 +183,14 @@ export const CreateClubScreen: React.FC = () => {
   };
 
   const handleSwipeLeft = () => {
-    if (currentProfileIndex < potentialMembers.length - 1) {
+    if (currentProfileIndex < filteredMembers.length - 1) {
       setCurrentProfileIndex(currentProfileIndex + 1);
     }
   };
 
   const handleSwipeRight = () => {
     // Send join request logic would go here
-    if (currentProfileIndex < potentialMembers.length - 1) {
+    if (currentProfileIndex < filteredMembers.length - 1) {
       setCurrentProfileIndex(currentProfileIndex + 1);
     }
   };
@@ -184,17 +209,113 @@ export const CreateClubScreen: React.FC = () => {
             <Text style={styles.swipeTitle}>Find Members</Text>
             <View style={{ width: 40 }} />
           </View>
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
-              {currentProfileIndex + 1} / {potentialMembers.length}
-            </Text>
-          </View>
         </LinearGradient>
 
+        <View style={styles.inviteSearchContainer}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name"
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            <TouchableOpacity
+              ref={filterButtonRef}
+              style={[styles.filterButton, showInterestMenu && styles.filterButtonActive]}
+              onPress={() => {
+                if (filterButtonRef.current) {
+                  filterButtonRef.current.measureInWindow((x, y, width, height) => {
+                    setFilterMenuCoords({ x, y, width, height });
+                    setShowInterestMenu((prev) => !prev);
+                  });
+                } else {
+                  setShowInterestMenu((prev) => !prev);
+                }
+              }}
+            >
+              <Ionicons name="options-outline" size={18} color={showInterestMenu ? '#E372A1' : '#6B7280'} />
+            </TouchableOpacity>
+          </View>
+          {filteredMembers.length > 0 && currentProfileIndex >= filteredMembers.length && (
+            <TouchableOpacity
+              style={styles.reloadBanner}
+              onPress={() => setCurrentProfileIndex(0)}
+            >
+              <Ionicons name="refresh" size={16} color="#B06579" />
+              <Text style={styles.reloadButtonText}>Reload cards</Text>
+            </TouchableOpacity>
+          )}
+          {showInterestMenu && filterMenuCoords && (
+            <TouchableOpacity
+              style={styles.interestOverlay}
+              activeOpacity={1}
+              onPress={() => setShowInterestMenu(false)}
+            >
+              <View
+                style={[
+                  styles.interestMenuDrawer,
+                  {
+                    top: filterMenuCoords.y - 40,
+                    left: Math.min(filterMenuCoords.x + filterMenuCoords.width - 160, SCREEN_WIDTH - 170),
+                  },
+                ]}
+              >
+                <ScrollView>
+                  <TouchableOpacity
+                    style={[styles.interestMenuItem, !selectedInterest && styles.interestMenuItemActive]}
+                    onPress={() => {
+                      setSelectedInterest(null);
+                      setShowInterestMenu(false);
+                    }}
+                  >
+                    <Text style={[styles.interestMenuText, !selectedInterest && styles.interestMenuTextActive]}>All interests</Text>
+                  </TouchableOpacity>
+                  {availableInterests.map((interest) => (
+                    <TouchableOpacity
+                      key={interest}
+                      style={[styles.interestMenuItem, selectedInterest === interest && styles.interestMenuItemActive]}
+                      onPress={() => {
+                        setSelectedInterest(interest);
+                        setShowInterestMenu(false);
+                      }}
+                    >
+                      <Text
+                        style={[styles.interestMenuText, selectedInterest === interest && styles.interestMenuTextActive]}
+                      >
+                        {interest}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {currentProfileIndex >= filteredMembers.length && filteredMembers.length > 0 && (
+          <TouchableOpacity
+            style={styles.reloadButton}
+            onPress={() => setCurrentProfileIndex(0)}
+          >
+            <Ionicons name="refresh" size={16} color="#B06579" />
+            <Text style={styles.reloadButtonText}>Reload cards</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.swipeCardContainer}>
-          {currentProfileIndex < potentialMembers.length ? (
+          {filteredMembers.length === 0 ? (
+            <View style={styles.emptySwipeState}>
+              <Ionicons name="search" size={36} color="#D1D5DB" />
+              <Text style={styles.emptySwipeTitle}>No matches</Text>
+              <Text style={styles.emptySwipeSubtitle}>Try a different search or filter.</Text>
+            </View>
+          ) : currentProfileIndex < filteredMembers.length ? (
             <SwipeCard
-              user={potentialMembers[currentProfileIndex]}
+              user={filteredMembers[currentProfileIndex]}
               onSwipeLeft={handleSwipeLeft}
               onSwipeRight={handleSwipeRight}
             />
@@ -209,6 +330,13 @@ export const CreateClubScreen: React.FC = () => {
               <Text style={styles.endCardTitle}>All Done!</Text>
               <Text style={styles.endCardSubtitle}>You've reviewed all potential members</Text>
               <TouchableOpacity
+                style={styles.reloadButton}
+                onPress={() => setCurrentProfileIndex(0)}
+              >
+                <Ionicons name="refresh" size={16} color="#B06579" />
+                <Text style={styles.reloadButtonText}>Reload cards</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.doneButton}
                 onPress={() => setIsSwipeMode(false)}
               >
@@ -216,34 +344,13 @@ export const CreateClubScreen: React.FC = () => {
                   colors={['#E372A1', '#CE678A', '#B06579']}
                   style={styles.doneButtonGradient}
                 >
-                  <Text style={styles.doneButtonText}>Go to My Clubs</Text>
+                  <Text style={styles.doneButtonText}>Back to clubs</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        <View style={styles.swipeActions}>
-          <TouchableOpacity
-            style={[styles.swipeButton, styles.passButton]}
-            onPress={handleSwipeLeft}
-            disabled={currentProfileIndex >= potentialMembers.length}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="close" size={32} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.swipeHint}>
-            <Text style={styles.swipeHintText}>Swipe or tap</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.swipeButton, styles.inviteButton]}
-            onPress={handleSwipeRight}
-            disabled={currentProfileIndex >= potentialMembers.length}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="heart" size={32} color="#fff" />
-          </TouchableOpacity>
-        </View>
       </View>
     );
   }
@@ -772,8 +879,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   swipeHeaderGradient: {
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingTop: 40,
+    paddingBottom: 14,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
@@ -802,19 +909,110 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
-  progressContainer: {
-    alignItems: 'center',
+  inviteSearchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 12,
   },
-  progressText: {
+  searchRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+    flex: 1,
+  },
+  searchInput: {
+    fontSize: 15,
+    color: '#111827',
+  },
+  filterButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterButtonActive: {
+    borderColor: '#E372A1',
+    backgroundColor: '#FDF2F8',
+  },
+  interestOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  interestMenuDrawer: {
+    position: 'absolute',
+    width: 180,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+    maxHeight: 200,
+  },
+  interestMenuItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  interestMenuItemActive: {
+    backgroundColor: '#FDF2F8',
+  },
+  interestMenuText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.9)',
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  interestMenuTextActive: {
+    color: '#E372A1',
+  },
+  progressInline: {
+    marginTop: 6,
+  },
+  progressInlineText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
   },
   swipeCardContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,
+  },
+  emptySwipeState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    gap: 8,
+  },
+  emptySwipeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  emptySwipeSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
   },
   endCard: {
     alignItems: 'center',
@@ -846,6 +1044,32 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     fontWeight: '500',
   },
+  reloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  reloadBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF5F8',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  reloadButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
   doneButton: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -863,43 +1087,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-  },
-  swipeActions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 30,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-  },
-  swipeHint: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-  },
-  swipeHintText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  swipeButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  passButton: {
-    backgroundColor: '#EF4444',
-  },
-  inviteButton: {
-    backgroundColor: '#10B981',
   },
 });
