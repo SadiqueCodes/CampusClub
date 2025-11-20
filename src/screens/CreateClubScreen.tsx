@@ -145,6 +145,7 @@ export const CreateClubScreen: React.FC = () => {
       memberCount: 1,
       createdAt: new Date(),
       groupChatId: `chat_${Date.now()}`,
+      logoEmoji: '👥',
       upcomingEvents: 0,
     };
 

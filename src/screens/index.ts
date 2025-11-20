@@ -10,3 +10,4 @@ export { ChatScreen } from './ChatScreen';
 export { ChatDetailScreen } from './ChatDetailScreen';
 export { ProfileScreen } from './ProfileScreen';
 export { SearchClubsScreen } from './SearchClubsScreen';
+export { SettingsScreen } from './SettingsScreen';

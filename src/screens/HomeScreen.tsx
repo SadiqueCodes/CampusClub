@@ -23,50 +23,6 @@ export const HomeScreen: React.FC = () => {
 
   // Mock data initialization
   useEffect(() => {
-    if (clubs.length === 0) {
-      useStore.getState().setClubs([
-        {
-          id: '1',
-          name: 'Art Club',
-          type: 'Arts & Culture',
-          description: 'For art lovers',
-          leaderId: '2',
-          leaderName: 'Sarah',
-          memberIds: [],
-          memberCount: 128,
-          createdAt: new Date(),
-          groupChatId: 'chat1',
-          upcomingEvents: 2,
-        },
-        {
-          id: '2',
-          name: 'Code Club',
-          type: 'Technology',
-          description: 'For developers',
-          leaderId: '3',
-          leaderName: 'Mike',
-          memberIds: [],
-          memberCount: 94,
-          createdAt: new Date(),
-          groupChatId: 'chat2',
-          upcomingEvents: 1,
-        },
-        {
-          id: '3',
-          name: 'Sport Club',
-          type: 'Sports',
-          description: 'For athletes',
-          leaderId: '4',
-          leaderName: 'John',
-          memberIds: [],
-          memberCount: 210,
-          createdAt: new Date(),
-          groupChatId: 'chat3',
-          upcomingEvents: 3,
-        },
-      ]);
-    }
-
     if (events.length === 0) {
       useStore.getState().setEvents([
         {
@@ -163,21 +119,41 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const getClubGradient = (type: string): [string, string] => {
-    switch (type) {
-      case 'Arts & Culture':
-        return ['#C86B8A', '#D98CA8'];
-      case 'Technology':
-        return ['#5A6BC8', '#7A8CD8'];
-      case 'Sports':
-        return ['#5A8F7B', '#7BAD96'];
-      case 'Academic':
-        return ['#D97B52', '#E89B7A'];
-      case 'Social':
-        return ['#C86B8A', '#D98CA8'];
-      default:
-        return ['#B06579', '#C67E8E'];
+  const heroCardGradients: Array<[string, string]> = [
+    ['#E372A1', '#CE678A'],
+    ['#5A6BC8', '#7A8CD8'],
+    ['#5A8F7B', '#7BAD96'],
+    ['#D97B52', '#E89B7A'],
+    ['#8E54E9', '#4776E6'],
+  ];
+
+  const hashString = (input: string) => {
+    let hash = 0;
+    for (let i = 0; i < input.length; i += 1) {
+      hash = input.charCodeAt(i) + ((hash << 5) - hash);
     }
+    return Math.abs(hash);
+  };
+
+  const getClubGradient = (club: Club): [string, string] => {
+    const paletteIndex = hashString(`${club.id || ''}-${club.name || ''}`) % heroCardGradients.length;
+    return heroCardGradients[paletteIndex];
+  };
+
+  const getMyClubs = () => {
+    if (!currentUser?.id) return [];
+    return clubs.filter((club) => club.memberIds.includes(currentUser.id));
+  };
+
+  const getClubRecommendations = () => {
+    if (clubs.length <= 3) {
+      return clubs;
+    }
+    return [...clubs].sort((a, b) => {
+      const scoreA = a.memberCount + a.upcomingEvents * 10;
+      const scoreB = b.memberCount + b.upcomingEvents * 10;
+      return scoreB - scoreA;
+    });
   };
 
   // Get popular clubs: clubs with >5 members OR clubs with upcoming events
@@ -195,10 +171,30 @@ export const HomeScreen: React.FC = () => {
     return sorted.slice(0, 5);
   };
 
-  const popularClubs = getPopularClubs();
+  const myClubList = getMyClubs();
+
+  const heroClubs = () => {
+    if (clubs.length === 0) {
+      return [];
+    }
+
+    if (clubs.length <= 3) {
+      return clubs;
+    }
+    const personal = myClubList.slice(0, 3);
+    if (personal.length === 3) return personal;
+
+    const ranking = getClubRecommendations().filter(
+      (club) => !personal.find((personalClub) => personalClub.id === club.id)
+    );
+
+    return [...personal, ...ranking.slice(0, 3 - personal.length)];
+  };
+
+  const popularClubs = heroClubs();
 
   const renderClubCard = ({ item }: { item: Club }) => {
-    const [gradientStart, gradientEnd] = getClubGradient(item.type);
+    const [gradientStart, gradientEnd] = getClubGradient(item);
 
     return (
       <TouchableOpacity style={styles.clubCard}>
@@ -226,6 +222,8 @@ export const HomeScreen: React.FC = () => {
                 <View style={styles.clubLogoContainer}>
                   {item.logo ? (
                     <Image source={{ uri: item.logo }} style={styles.clubLogo} />
+                  ) : item.logoEmoji ? (
+                    <Text style={styles.clubLogoEmoji}>{item.logoEmoji}</Text>
                   ) : (
                     <Ionicons name={getClubIcon(item.type) as any} size={20} color="#fff" />
                   )}
@@ -537,6 +535,10 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
+  },
+  clubLogoEmoji: {
+    fontSize: 20,
+    color: '#fff',
   },
   clubCardBadge: {
     flexDirection: 'row',

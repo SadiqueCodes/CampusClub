@@ -27,6 +27,7 @@ export interface Club {
   createdAt: Date;
   groupChatId: string;
   logo?: string; // Club logo/icon uploaded by user
+  logoEmoji?: string; // Emoji fallback for club branding
   coverPhoto?: string;
   upcomingEvents: number;
 }

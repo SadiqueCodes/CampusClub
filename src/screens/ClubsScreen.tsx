@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,82 +17,9 @@ import { Club, JoinRequest } from '../types';
 
 export const ClubsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { clubs, myClubs, currentUser, setClubs, addJoinRequest } = useStore();
+  const { clubs, myClubs, currentUser, addJoinRequest } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredClubs, setFilteredClubs] = useState<Club[]>([]);
-
-  useEffect(() => {
-    // Mock clubs data if empty
-    if (clubs.length === 0 && currentUser) {
-      setClubs([
-        {
-          id: '1',
-          name: 'Art Appreciation Club',
-          type: 'Arts & Culture',
-          description: 'Explore and appreciate various forms of art',
-          leaderId: '2',
-          leaderName: 'Sarah Johnson',
-          memberIds: ['2', '3', '4', currentUser.id],
-          memberCount: 45,
-          createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-          groupChatId: 'chat1',
-          upcomingEvents: 3,
-        },
-        {
-          id: '2',
-          name: 'Coding Enthusiasts',
-          type: 'Technology',
-          description: 'Learn and share coding knowledge',
-          leaderId: '3',
-          leaderName: 'Mike Chen',
-          memberIds: ['3', '5', '6'],
-          memberCount: 67,
-          createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000),
-          groupChatId: 'chat2',
-          upcomingEvents: 5,
-        },
-        {
-          id: '3',
-          name: 'Photography Club',
-          type: 'Arts & Culture',
-          description: 'Capture moments and share photography tips',
-          leaderId: '4',
-          leaderName: 'Emma Wilson',
-          memberIds: ['4', '7', '8'],
-          memberCount: 32,
-          createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-          groupChatId: 'chat3',
-          upcomingEvents: 2,
-        },
-        {
-          id: '4',
-          name: 'Debate Society',
-          type: 'Academic',
-          description: 'Engage in intellectual debates and discussions',
-          leaderId: '5',
-          leaderName: 'John Davis',
-          memberIds: ['5', '9', '10'],
-          memberCount: 28,
-          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-          groupChatId: 'chat4',
-          upcomingEvents: 1,
-        },
-        {
-          id: '5',
-          name: 'Music Makers',
-          type: 'Arts & Culture',
-          description: 'Create and perform music together',
-          leaderId: '6',
-          leaderName: 'Lisa Anderson',
-          memberIds: ['6', '11', '12'],
-          memberCount: 51,
-          createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
-          groupChatId: 'chat5',
-          upcomingEvents: 4,
-        },
-      ]);
-    }
-  }, []);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -140,7 +68,13 @@ export const ClubsScreen: React.FC = () => {
           colors={['#E372A1', '#CE678A', '#B06579']}
           style={styles.clubIconGradient}
         >
-          <Ionicons name="people" size={28} color="#fff" />
+          {club.logo ? (
+            <Image source={{ uri: club.logo }} style={styles.clubIconImage} />
+          ) : club.logoEmoji ? (
+            <Text style={styles.clubIconEmoji}>{club.logoEmoji}</Text>
+          ) : (
+            <Ionicons name="people" size={28} color="#fff" />
+          )}
         </LinearGradient>
       </View>
       <View style={styles.clubInfo}>
@@ -374,6 +308,15 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  clubIconImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  clubIconEmoji: {
+    fontSize: 28,
+    color: '#fff',
   },
   clubInfo: {
     flex: 1,

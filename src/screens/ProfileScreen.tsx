@@ -1,11 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
+import { useNavigation } from '@react-navigation/native';
 
 export const ProfileScreen: React.FC = () => {
   const { currentUser, myClubs, logout } = useStore();
+  const navigation = useNavigation<any>();
+  const yearLabelMap: Record<string, string> = {
+    Freshman: 'First Year',
+    Sophomore: 'Second Year',
+    Junior: 'Third Year',
+    Senior: 'Fourth Year',
+  };
 
   if (!currentUser) return null;
 
@@ -15,91 +23,82 @@ export const ProfileScreen: React.FC = () => {
         colors={['#E372A1', '#CE678A', '#B06579']}
         style={styles.headerGradient}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity style={styles.settingsButton}>
-            <Ionicons name="settings-outline" size={24} color="#fff" />
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.headerSubtitle}>{currentUser.collegeName}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('ProfileSettings')}
+          >
+            <Ionicons name="settings-outline" size={20} color="#fff" />
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.profileHeader}>
-          <View style={styles.profilePhotoContainer}>
-            <LinearGradient
-              colors={['#fff', '#F8F9FA']}
-              style={styles.profilePhoto}
-            >
-              <Text style={styles.profileInitial}>{currentUser.name.charAt(0)}</Text>
-            </LinearGradient>
-          </View>
-          <Text style={styles.name}>{currentUser.name}</Text>
-          <View style={styles.infoRow}>
-            <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.infoText}>{currentUser.email}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="school-outline" size={16} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.infoText}>{currentUser.major} • {currentUser.year}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="card-outline" size={16} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.infoText}>{currentUser.collegeId}</Text>
-          </View>
         </View>
       </LinearGradient>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-
-        {/* Stats Section */}
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Ionicons name="people" size={24} color="#B06579" />
-            <Text style={styles.statValue}>{myClubs.length}</Text>
-            <Text style={styles.statLabel}>Clubs</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileCard}>
+          <View style={styles.profileRow}>
+            <View style={styles.profileAvatar}>
+              {currentUser.profilePhoto ? (
+                <Image source={{ uri: currentUser.profilePhoto }} style={styles.profilePhotoImage} />
+              ) : (
+                <Text style={styles.profileInitial}>{currentUser.name.charAt(0)}</Text>
+              )}
+            </View>
+            <View style={styles.profileDetails}>
+              <Text style={styles.name}>{currentUser.name}</Text>
+              <Text style={styles.metaText}>
+                {currentUser.major} • {yearLabelMap[currentUser.year] || currentUser.year}
+              </Text>
+              <View style={styles.detailRow}>
+                <Ionicons name="mail-outline" size={16} color="#B06579" />
+                <Text style={styles.detailText}>{currentUser.email}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="card-outline" size={16} color="#B06579" />
+                <Text style={styles.detailText}>{currentUser.collegeId}</Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Ionicons name="calendar" size={24} color="#B06579" />
-            <Text style={styles.statValue}>{currentUser.eventsAttended}</Text>
-            <Text style={styles.statLabel}>Events</Text>
+        </View>
+        <View style={styles.snapshotRow}>
+          <View style={styles.snapshotChip}>
+            <Text style={styles.snapshotLabel}>Clubs</Text>
+            <Text style={styles.snapshotValue}>{myClubs.length}</Text>
           </View>
-          <View style={styles.statCard}>
-            <Ionicons name="pricetag" size={24} color="#B06579" />
-            <Text style={styles.statValue}>{currentUser.totalTransactions}</Text>
-            <Text style={styles.statLabel}>Listings</Text>
+          <View style={styles.snapshotChip}>
+            <Text style={styles.snapshotLabel}>Events</Text>
+            <Text style={styles.snapshotValue}>{currentUser.eventsAttended}</Text>
+          </View>
+          <View style={styles.snapshotChip}>
+            <Text style={styles.snapshotLabel}>Listings</Text>
+            <Text style={styles.snapshotValue}>{currentUser.totalTransactions}</Text>
           </View>
         </View>
 
-        {/* My Clubs Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="people" size={20} color="#1F2937" />
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionCardHeader}>
             <Text style={styles.sectionTitle}>My Clubs</Text>
+            <Text style={styles.sectionSubtitle}>{myClubs.length} total</Text>
           </View>
           {myClubs.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#D1D5DB" />
+              <Ionicons name="people-outline" size={36} color="#D1D5DB" />
               <Text style={styles.emptyText}>You haven't joined any clubs yet</Text>
             </View>
           ) : (
             myClubs.map((club) => (
-              <View key={club.id} style={styles.clubCard}>
-                <View style={styles.clubIconContainer}>
-                  <LinearGradient
-                    colors={['#E372A1', '#CE678A', '#B06579']}
-                    style={styles.clubIcon}
-                  >
-                    <Ionicons name="people" size={20} color="#fff" />
-                  </LinearGradient>
-                </View>
-                <View style={styles.clubInfo}>
+              <View key={club.id} style={styles.clubRow}>
+                <View>
                   <Text style={styles.clubName}>{club.name}</Text>
                   <Text style={styles.clubType}>{club.type}</Text>
                 </View>
                 {club.leaderId === currentUser.id && (
                   <View style={styles.leaderBadge}>
-                    <Text style={styles.leaderBadgeText}>Leader</Text>
+                    <Ionicons name="star" size={14} color="#fff" />
+                    <Text style={styles.leaderBadgeText}>Lead</Text>
                   </View>
                 )}
               </View>
@@ -107,60 +106,44 @@ export const ProfileScreen: React.FC = () => {
           )}
         </View>
 
-        {/* My Listings Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="pricetag" size={20} color="#1F2937" />
-            <Text style={styles.sectionTitle}>My Listings</Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionCardHeader}>
+            <Text style={styles.sectionTitle}>Listings</Text>
+            <TouchableOpacity>
+              <Text style={styles.sectionAction}>View all</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.listingCard}>
-            <View style={styles.listingIconContainer}>
-              <Ionicons name="camera-outline" size={24} color="#B06579" />
+          {['Camera', 'Laptop', 'Textbook'].map((item, index) => (
+            <View key={item} style={styles.listingRow}>
+              <View style={styles.listingChip}>
+                <Ionicons
+                  name={index === 0 ? 'camera-outline' : index === 1 ? 'laptop-outline' : 'book-outline'}
+                  size={18}
+                  color="#B06579"
+                />
+              </View>
+              <View style={styles.listingInfo}>
+                <Text style={styles.listingTitle}>{item}</Text>
+                <Text style={styles.listingPrice}>{index === 0 ? '$120' : index === 1 ? '$450' : '$30'}</Text>
+              </View>
+              <View style={[styles.listingStatusBadge, index === 2 && styles.soldBadge]}>
+                <Text style={[styles.listingStatusText, index === 2 && styles.soldText]}>
+                  {index === 2 ? 'Sold' : 'Active'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.listingInfo}>
-              <Text style={styles.listingTitle}>Camera</Text>
-              <Text style={styles.listingPrice}>$120</Text>
-            </View>
-            <View style={styles.listingStatusBadge}>
-              <Text style={styles.listingStatusText}>Active</Text>
-            </View>
-          </View>
-          <View style={styles.listingCard}>
-            <View style={styles.listingIconContainer}>
-              <Ionicons name="laptop-outline" size={24} color="#B06579" />
-            </View>
-            <View style={styles.listingInfo}>
-              <Text style={styles.listingTitle}>Laptop</Text>
-              <Text style={styles.listingPrice}>$450</Text>
-            </View>
-            <View style={styles.listingStatusBadge}>
-              <Text style={styles.listingStatusText}>Active</Text>
-            </View>
-          </View>
-          <View style={styles.listingCard}>
-            <View style={styles.listingIconContainer}>
-              <Ionicons name="book-outline" size={24} color="#B06579" />
-            </View>
-            <View style={styles.listingInfo}>
-              <Text style={styles.listingTitle}>Textbook</Text>
-              <Text style={styles.listingPrice}>$30</Text>
-            </View>
-            <View style={[styles.listingStatusBadge, styles.soldBadge]}>
-              <Text style={[styles.listingStatusText, styles.soldText]}>Sold</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <LinearGradient
-            colors={['#E372A1', '#CE678A', '#B06579']}
-            style={styles.logoutGradient}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#fff" />
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionCardHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutRow} onPress={logout}>
+            <Ionicons name="log-out-outline" size={20} color="#E372A1" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -172,8 +155,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   headerGradient: {
-    paddingTop: 50,
+    paddingTop: 48,
     paddingBottom: 24,
+    paddingHorizontal: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
@@ -181,97 +165,150 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
+    gap: 20,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 24,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#fff',
   },
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '600',
+  },
   settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileHeader: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  profilePhotoContainer: {
-    marginBottom: 16,
-  },
-  profilePhoto: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#fff',
+  profileCard: {
+    backgroundColor: '#fff',
+    marginHorizontal:2,
+    marginTop: 12,
+    borderRadius: 20,
+    padding: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 4,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  profileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePhotoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
   },
   profileInitial: {
-    fontSize: 42,
+    fontSize: 36,
     fontWeight: '800',
     color: '#B06579',
   },
-  name: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 8,
+  profileDetails: {
+    flex: 1,
+    gap: 4,
   },
-  infoRow: {
+  name: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  metaText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    gap: 6,
   },
-  infoText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+  detailText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '600',
   },
   content: {
     padding: 20,
     paddingBottom: 100,
+    gap: 24,
+  },
+  snapshotRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  snapshotChip: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 4,
+  },
+  snapshotLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  snapshotValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
   },
   statsSection: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
+    borderRadius: 18,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
+    gap: 10,
+  },
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: '#B06579',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statValue: {
     fontSize: 24,
     fontWeight: '800',
     color: '#1F2937',
-    marginTop: 8,
-    marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
@@ -280,6 +317,14 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -291,80 +336,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#1F2937',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 12,
-    fontWeight: '500',
-  },
-  clubCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  clubIconContainer: {
-    marginRight: 12,
-  },
-  clubIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clubInfo: {
-    flex: 1,
-  },
-  clubName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  clubType: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  leaderBadge: {
-    backgroundColor: '#FFF5F8',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  leaderBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#B06579',
-  },
-  listingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
   },
   listingIconContainer: {
     width: 48,
@@ -406,6 +377,96 @@ const styles = StyleSheet.create({
   soldText: {
     color: '#6B7280',
   },
+  sectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 12,
+  },
+  sectionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  sectionAction: {
+    fontSize: 13,
+    color: '#B06579',
+    fontWeight: '700',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  clubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  clubInfo: {
+    flex: 1,
+  },
+  clubName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  clubType: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  leaderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E372A1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  leaderBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  listingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  listingChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: '#FFF5F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
   logoutButton: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -427,5 +488,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+  },
+  logoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 4,
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#E372A1',
   },
 });

@@ -12,6 +12,7 @@ import { EventsScreen } from '../screens/EventsScreen';
 import { CreateClubScreen } from '../screens/CreateClubScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 import { SearchClubsScreen } from '../screens/SearchClubsScreen';
 import { theme } from '../theme';
 
@@ -19,7 +20,16 @@ const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const EventsStack = createNativeStackNavigator();
 const ClubsStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 const SearchStack = createNativeStackNavigator();
+const ProfileStackNavigator: React.FC = () => {
+  return (
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
+      <ProfileStack.Screen name="ProfileSettings" component={SettingsScreen} />
+    </ProfileStack.Navigator>
+  );
+};
 
 const HomeStackNavigator: React.FC = () => {
   return (
@@ -144,7 +154,7 @@ export const TabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Ionicons

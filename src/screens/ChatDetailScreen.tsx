@@ -236,6 +236,9 @@ export const ChatDetailScreen: React.FC = () => {
           : c
       )
     );
+    if (club) {
+      updateClub(club.id, { logoEmoji: emoji, logo: undefined });
+    }
     setShowAvatarModal(false);
   };
 
@@ -246,7 +249,7 @@ export const ChatDetailScreen: React.FC = () => {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: [ImagePicker.MediaType.IMAGES],
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -264,6 +267,9 @@ export const ChatDetailScreen: React.FC = () => {
             : c
         )
       );
+      if (club) {
+        updateClub(club.id, { logo: uri, logoEmoji: undefined });
+      }
     }
     setShowAvatarModal(false);
   };
