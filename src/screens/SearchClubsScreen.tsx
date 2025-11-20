@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -10,10 +10,7 @@ export const SearchClubsScreen: React.FC = () => {
   const [query, setQuery] = useState('');
 
   const myId = currentUser?.id || '';
-  const availableClubs = useMemo(
-    () => clubs.filter((club) => !club.memberIds.includes(myId)),
-    [clubs, myId]
-  );
+  const availableClubs = useMemo(() => clubs, [clubs]);
 
   const filteredClubs = useMemo(() => {
     if (!query.trim()) return availableClubs;
@@ -29,7 +26,12 @@ export const SearchClubsScreen: React.FC = () => {
   const requestedClubIds = useMemo(
     () =>
       joinRequests
-        .filter((request) => request.userId === myId && request.status === 'pending')
+        .filter(
+          (request) =>
+            request.userId === myId &&
+            request.status === 'pending' &&
+            request.initiatedBy === 'user'
+        )
         .map((request) => request.clubId),
     [joinRequests, myId]
   );
@@ -37,12 +39,18 @@ export const SearchClubsScreen: React.FC = () => {
   const handleRequestJoin = (club: Club) => {
     if (!currentUser) return;
     if (requestedClubIds.includes(club.id)) return;
+    if (club.memberIds.includes(myId)) {
+      Alert.alert('Already joined', 'You are already a member of this club.');
+      return;
+    }
 
     addJoinRequest({
       id: `request_${Date.now()}`,
       clubId: club.id,
       userId: currentUser.id,
       userName: currentUser.name,
+      userPhoto: currentUser.profilePhoto,
+      initiatedBy: 'user',
       status: 'pending',
       createdAt: new Date(),
     });
@@ -81,6 +89,9 @@ export const SearchClubsScreen: React.FC = () => {
         ) : (
           filteredClubs.map((club) => {
             const isRequested = requestedClubIds.includes(club.id);
+            const isMember = club.memberIds.includes(myId);
+            const buttonLabel = isMember ? 'Already joined' : isRequested ? 'Request Sent' : 'Request to Join';
+            const buttonDisabled = isRequested;
             return (
               <View key={club.id} style={styles.clubCard}>
                 <View style={styles.clubHeaderRow}>
@@ -103,13 +114,14 @@ export const SearchClubsScreen: React.FC = () => {
                   </View>
                 </View>
                 <TouchableOpacity
-                  style={[styles.joinButton, isRequested && styles.joinButtonDisabled]}
+                  style={[
+                    styles.joinButton,
+                    (buttonDisabled || isMember) && styles.joinButtonDisabled,
+                  ]}
                   onPress={() => handleRequestJoin(club)}
-                  disabled={isRequested}
+                  disabled={buttonDisabled}
                 >
-                  <Text style={styles.joinButtonText}>
-                    {isRequested ? 'Request Sent' : 'Request to Join'}
-                  </Text>
+                  <Text style={styles.joinButtonText}>{buttonLabel}</Text>
                 </TouchableOpacity>
               </View>
             );

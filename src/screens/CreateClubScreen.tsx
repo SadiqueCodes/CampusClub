@@ -30,11 +30,15 @@ export const CreateClubScreen: React.FC = () => {
   const addChat = useStore((state) => state.addChat);
   const chats = useStore((state) => state.chats);
   const clubs = useStore((state) => state.clubs);
+  const joinRequests = useStore((state) => state.joinRequests);
+  const addJoinRequest = useStore((state) => state.addJoinRequest);
 
   const myClubs = useMemo(() => {
     if (!currentUser?.id) return [];
     return clubs.filter((club) => club.memberIds.includes(currentUser.id));
   }, [clubs, currentUser?.id]);
+  const [activeClubId, setActiveClubId] = useState<string | null>(null);
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   // Mock users for swiping
   const [potentialMembers] = useState<User[]>([
@@ -95,6 +99,25 @@ export const CreateClubScreen: React.FC = () => {
     return Array.from(interestSet).slice(0, 8);
   }, [potentialMembers]);
 
+  const activeClub = useMemo(
+    () => (activeClubId ? clubs.find((club) => club.id === activeClubId) || null : null),
+    [clubs, activeClubId]
+  );
+
+  const invitedMemberIds = useMemo(() => {
+    if (!activeClubId) return new Set<string>();
+    return new Set(
+      joinRequests
+        .filter(
+          (request) =>
+            request.clubId === activeClubId &&
+            request.initiatedBy === 'leader' &&
+            request.status === 'pending'
+        )
+        .map((request) => request.userId)
+    );
+  }, [joinRequests, activeClubId]);
+
   const filteredMembers = useMemo(() => {
     return potentialMembers.filter((member) => {
       const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -106,6 +129,12 @@ export const CreateClubScreen: React.FC = () => {
   useEffect(() => {
     setCurrentProfileIndex(0);
   }, [searchQuery, selectedInterest]);
+
+  useEffect(() => {
+    if (!inviteFeedback) return;
+    const timeout = setTimeout(() => setInviteFeedback(null), 2500);
+    return () => clearTimeout(timeout);
+  }, [inviteFeedback]);
 
   const getClubChat = (clubId: string) => chats.find((chat) => chat.clubId === clubId);
 
@@ -120,6 +149,28 @@ export const CreateClubScreen: React.FC = () => {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
+  };
+
+  const handleInviteMember = (member: User) => {
+    if (!currentUser) return;
+    if (!activeClub) {
+      Alert.alert('Select a club', 'Choose a club first to send invites from the list of your clubs.');
+      return;
+    }
+    if (invitedMemberIds.has(member.id)) {
+      setInviteFeedback(`${member.name} already invited`);
+      return;
+    }
+    addJoinRequest({
+      id: `invite_${Date.now()}`,
+      clubId: activeClub.id,
+      userId: member.id,
+      userName: member.name,
+      initiatedBy: 'leader',
+      status: 'pending',
+      createdAt: new Date(),
+    });
+    setInviteFeedback(`Invite sent to ${member.name}`);
   };
 
   const handleOpenChat = (club: Club) => {
@@ -171,6 +222,7 @@ export const CreateClubScreen: React.FC = () => {
       clubId: newClub.id,
     });
 
+    setActiveClubId(newClub.id);
     setShowCreateModal(false);
     setIsSwipeMode(true);
     setCurrentProfileIndex(0);
@@ -183,6 +235,13 @@ export const CreateClubScreen: React.FC = () => {
     setClubType('Academic');
   };
 
+  const closeSwipeMode = () => {
+    setIsSwipeMode(false);
+    setActiveClubId(null);
+    setShowInterestMenu(false);
+    setInviteFeedback(null);
+  };
+
   const handleSwipeLeft = () => {
     if (currentProfileIndex < filteredMembers.length - 1) {
       setCurrentProfileIndex(currentProfileIndex + 1);
@@ -190,7 +249,10 @@ export const CreateClubScreen: React.FC = () => {
   };
 
   const handleSwipeRight = () => {
-    // Send join request logic would go here
+    const currentProfile = filteredMembers[currentProfileIndex];
+    if (currentProfile) {
+      handleInviteMember(currentProfile);
+    }
     if (currentProfileIndex < filteredMembers.length - 1) {
       setCurrentProfileIndex(currentProfileIndex + 1);
     }
@@ -204,17 +266,22 @@ export const CreateClubScreen: React.FC = () => {
           style={styles.swipeHeaderGradient}
         >
           <View style={styles.swipeHeader}>
-            <TouchableOpacity onPress={() => setIsSwipeMode(false)} style={styles.backButtonContainer}>
+            <TouchableOpacity onPress={closeSwipeMode} style={styles.backButtonContainer}>
               <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.swipeTitle}>Find Members</Text>
+            <View style={styles.swipeTitleWrapper}>
+              <Text style={styles.swipeTitle}>Find Members</Text>
+              {activeClub && (
+                <Text style={styles.swipeSubtitle}>Inviting for {activeClub.name}</Text>
+              )}
+            </View>
             <View style={{ width: 40 }} />
           </View>
         </LinearGradient>
 
         <View style={styles.inviteSearchContainer}>
           <View style={styles.searchRow}>
-            <View style={styles.searchInputWrapper}>
+            <View style={[styles.searchInputWrapper, { flex: 1 }]}>
               <Ionicons name="search" size={16} color="#9CA3AF" />
               <TextInput
                 style={styles.searchInput}
@@ -224,23 +291,24 @@ export const CreateClubScreen: React.FC = () => {
                 onChangeText={setSearchQuery}
               />
             </View>
-            <TouchableOpacity
-              ref={filterButtonRef}
-              style={[styles.filterButton, showInterestMenu && styles.filterButtonActive]}
-              onPress={() => {
-                if (filterButtonRef.current) {
-                  filterButtonRef.current.measureInWindow((x, y, width, height) => {
-                    setFilterMenuCoords({ x, y, width, height });
-                    setShowInterestMenu((prev) => !prev);
-                  });
-                } else {
-                  setShowInterestMenu((prev) => !prev);
-                }
-              }}
-            >
-              <Ionicons name="options-outline" size={18} color={showInterestMenu ? '#E372A1' : '#6B7280'} />
-            </TouchableOpacity>
           </View>
+          <View style={styles.inviteContextRow}>
+            <Ionicons name="pricetag" size={14} color="#B06579" />
+            <Text
+              style={[
+                styles.inviteContextText,
+                !activeClub && styles.inviteContextTextMuted,
+              ]}
+            >
+              {activeClub ? `Inviting members to ${activeClub.name}` : 'Select one of your clubs to send invites'}
+            </Text>
+          </View>
+          {inviteFeedback && (
+            <View style={styles.inviteFeedbackChip}>
+              <Ionicons name="sparkles" size={14} color="#B06579" />
+              <Text style={styles.inviteFeedbackText}>{inviteFeedback}</Text>
+            </View>
+          )}
           {filteredMembers.length > 0 && currentProfileIndex >= filteredMembers.length && (
             <TouchableOpacity
               style={styles.reloadBanner}
@@ -250,51 +318,7 @@ export const CreateClubScreen: React.FC = () => {
               <Text style={styles.reloadButtonText}>Reload cards</Text>
             </TouchableOpacity>
           )}
-          {showInterestMenu && filterMenuCoords && (
-            <TouchableOpacity
-              style={styles.interestOverlay}
-              activeOpacity={1}
-              onPress={() => setShowInterestMenu(false)}
-            >
-              <View
-                style={[
-                  styles.interestMenuDrawer,
-                  {
-                    top: filterMenuCoords.y - 40,
-                    left: Math.min(filterMenuCoords.x + filterMenuCoords.width - 160, SCREEN_WIDTH - 170),
-                  },
-                ]}
-              >
-                <ScrollView>
-                  <TouchableOpacity
-                    style={[styles.interestMenuItem, !selectedInterest && styles.interestMenuItemActive]}
-                    onPress={() => {
-                      setSelectedInterest(null);
-                      setShowInterestMenu(false);
-                    }}
-                  >
-                    <Text style={[styles.interestMenuText, !selectedInterest && styles.interestMenuTextActive]}>All interests</Text>
-                  </TouchableOpacity>
-                  {availableInterests.map((interest) => (
-                    <TouchableOpacity
-                      key={interest}
-                      style={[styles.interestMenuItem, selectedInterest === interest && styles.interestMenuItemActive]}
-                      onPress={() => {
-                        setSelectedInterest(interest);
-                        setShowInterestMenu(false);
-                      }}
-                    >
-                      <Text
-                        style={[styles.interestMenuText, selectedInterest === interest && styles.interestMenuTextActive]}
-                      >
-                        {interest}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          )}
+          {/* filter temporarily hidden */}
         </View>
 
         {currentProfileIndex >= filteredMembers.length && filteredMembers.length > 0 && (
@@ -339,7 +363,7 @@ export const CreateClubScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.doneButton}
-                onPress={() => setIsSwipeMode(false)}
+                onPress={closeSwipeMode}
               >
                 <LinearGradient
                   colors={['#E372A1', '#CE678A', '#B06579']}
@@ -462,6 +486,8 @@ export const CreateClubScreen: React.FC = () => {
                   style={styles.addMembersButton}
                   onPress={(event: GestureResponderEvent) => {
                     event.stopPropagation();
+                    setActiveClubId(club.id);
+                    setInviteFeedback(null);
                     setIsSwipeMode(true);
                   }}
                 >
@@ -910,6 +936,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  swipeTitleWrapper: {
+    alignItems: 'center',
+  },
+  swipeSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+    fontWeight: '500',
+  },
   inviteSearchContainer: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -949,12 +984,41 @@ const styles = StyleSheet.create({
     borderColor: '#E372A1',
     backgroundColor: '#FDF2F8',
   },
+  inviteContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inviteContextText: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  inviteContextTextMuted: {
+    color: '#9CA3AF',
+  },
+  inviteFeedbackChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF5F8',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  inviteFeedbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B06579',
+  },
   interestOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 10,
   },
   interestMenuDrawer: {
     position: 'absolute',
@@ -970,6 +1034,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
     maxHeight: 200,
+    zIndex: 20,
   },
   interestMenuItem: {
     paddingHorizontal: 16,

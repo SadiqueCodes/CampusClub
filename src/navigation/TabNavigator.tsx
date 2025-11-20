@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HomeScreen } from '../screens/HomeScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AddEventScreen } from '../screens/AddEventScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { ManageEventScreen } from '../screens/ManageEventScreen';
@@ -37,6 +38,7 @@ const HomeStackNavigator: React.FC = () => {
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen name="AddEvent" component={AddEventScreen} />
       <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
+      <HomeStack.Screen name="Notifications" component={NotificationsScreen} />
     </HomeStack.Navigator>
   );
 };

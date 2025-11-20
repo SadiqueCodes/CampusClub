@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { Club, JoinRequest } from '../types';
 
 export const ClubsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { clubs, myClubs, currentUser, addJoinRequest } = useStore();
+  const { clubs, myClubs, currentUser, addJoinRequest, joinRequests } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredClubs, setFilteredClubs] = useState<Club[]>([]);
 
@@ -35,6 +35,20 @@ export const ClubsScreen: React.FC = () => {
     }
   }, [searchQuery, clubs]);
 
+  const pendingRequestIds = useMemo(() => {
+    if (!currentUser?.id) return new Set<string>();
+    return new Set(
+      joinRequests
+        .filter(
+          (request) =>
+            request.userId === currentUser.id &&
+            request.status === 'pending' &&
+            request.initiatedBy === 'user'
+        )
+        .map((request) => request.clubId)
+    );
+  }, [joinRequests, currentUser?.id]);
+
   const handleJoinClub = (club: Club) => {
     if (!currentUser) return;
 
@@ -44,6 +58,7 @@ export const ClubsScreen: React.FC = () => {
       userId: currentUser.id,
       userName: currentUser.name,
       userPhoto: currentUser.profilePhoto,
+      initiatedBy: 'user',
       status: 'pending',
       createdAt: new Date(),
     };
@@ -57,7 +72,9 @@ export const ClubsScreen: React.FC = () => {
     );
   };
 
-  const renderClubCard = (club: Club, isMyClub: boolean = false) => (
+  const renderClubCard = (club: Club, isMyClub: boolean = false) => {
+    const isPending = pendingRequestIds.has(club.id);
+    return (
     <TouchableOpacity
       key={club.id}
       style={styles.clubCard}
@@ -95,14 +112,18 @@ export const ClubsScreen: React.FC = () => {
       </View>
       {!isMyClub && (
         <TouchableOpacity
-          style={styles.joinButton}
+          style={[styles.joinButton, isPending && styles.joinButtonDisabled]}
           onPress={() => handleJoinClub(club)}
+          disabled={isPending}
         >
-          <Ionicons name="add" size={20} color="#B06579" />
+          <Text style={[styles.joinButtonText, isPending && styles.joinButtonTextDisabled]}>
+            {isPending ? 'Applied' : 'Join'}
+          </Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
   );
+  };
 
   // Filter out clubs the user already belongs to
   const availableClubs = filteredClubs.filter(
@@ -355,12 +376,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   joinButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#FFF5F8',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  joinButtonDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  joinButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B06579',
+  },
+  joinButtonTextDisabled: {
+    color: '#9CA3AF',
   },
   emptyState: {
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,8 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Line, Defs, Pattern, Rect } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 import { Lobster_400Regular } from '@expo-google-fonts/lobster';
-import { Card } from '../components';
-import { theme } from '../theme';
 import { useStore } from '../store';
 import { Club, Event, MarketplaceItem } from '../types';
 
@@ -15,11 +13,62 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { clubs, events, marketplaceItems, currentUser } = useStore();
-
+  const { clubs, events, marketplaceItems, currentUser, joinRequests } = useStore();
   const [fontsLoaded] = useFonts({
     Lobster_400Regular,
   });
+  const myId = currentUser?.id || '';
+
+  const myRequests = useMemo(
+    () => joinRequests.filter((request) => request.userId === myId),
+    [joinRequests, myId]
+  );
+
+  const pendingRequestClubIds = useMemo(() => {
+    return new Set(
+      joinRequests
+        .filter(
+          (request) => request.userId === myId && request.status === 'pending' && request.initiatedBy === 'user'
+        )
+        .map((request) => request.clubId)
+    );
+  }, [joinRequests, myId]);
+
+  const pendingMyRequests = useMemo(
+    () =>
+      myRequests.filter(
+        (request) => request.status === 'pending' && request.initiatedBy === 'user'
+      ),
+    [myRequests]
+  );
+
+  const incomingRequests = useMemo(() => {
+    if (!myId) return [];
+    return joinRequests.filter((request) => {
+      if (request.initiatedBy !== 'user') return false;
+      const club = clubs.find((c) => c.id === request.clubId);
+      return club && club.leaderId === myId;
+    });
+  }, [joinRequests, clubs, myId]);
+
+  const pendingIncomingRequests = useMemo(
+    () => incomingRequests.filter((request) => request.status === 'pending'),
+    [incomingRequests]
+  );
+
+  const invitationsForMe = useMemo(
+    () =>
+      joinRequests.filter(
+        (request) =>
+          request.initiatedBy === 'leader' &&
+          request.userId === myId &&
+          request.status === 'pending'
+      ),
+    [joinRequests, myId]
+  );
+
+  const notificationCount =
+    pendingIncomingRequests.length + pendingMyRequests.length + invitationsForMe.length;
 
   // Mock data initialization
   useEffect(() => {
@@ -195,9 +244,17 @@ export const HomeScreen: React.FC = () => {
 
   const renderClubCard = ({ item }: { item: Club }) => {
     const [gradientStart, gradientEnd] = getClubGradient(item);
+    const isMember = currentUser ? item.memberIds.includes(currentUser.id) : false;
+    const isPending = pendingRequestClubIds.has(item.id);
+    let ctaLabel = 'Apply';
+    if (isMember) {
+      ctaLabel = 'Joined';
+    } else if (isPending) {
+      ctaLabel = 'Applied';
+    }
 
     return (
-      <TouchableOpacity style={styles.clubCard}>
+      <TouchableOpacity style={styles.clubCard} activeOpacity={0.98}>
         <LinearGradient
           colors={[gradientStart, gradientEnd]}
           style={styles.clubCardGradient}
@@ -236,8 +293,10 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
               <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
             </View>
-            <TouchableOpacity style={styles.applyButton}>
-              <Text style={styles.applyButtonText}>Apply</Text>
+            <TouchableOpacity style={[styles.applyButton, (isMember || isPending) && styles.applyButtonDisabled]} disabled>
+              <Text style={[styles.applyButtonText, (isMember || isPending) && styles.applyButtonTextMuted]}>
+                {ctaLabel}
+              </Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -256,9 +315,18 @@ export const HomeScreen: React.FC = () => {
       >
         <View style={styles.header}>
           <Text style={styles.greeting}>CampusClub</Text>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Ionicons name="notifications-outline" size={22} color="#fff" />
-            <View style={styles.notificationBadge} />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {notificationCount > 9 ? '9+' : notificationCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -437,12 +505,20 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FF6B6B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   scrollContent: {
     paddingBottom: 100,
@@ -574,10 +650,16 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 8,
   },
+  applyButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
   applyButtonText: {
     fontSize: 14,
     fontWeight: '700',
     color: '#2D3436',
+  },
+  applyButtonTextMuted: {
+    color: '#6B7280',
   },
   emptyClubs: {
     paddingHorizontal: 20,

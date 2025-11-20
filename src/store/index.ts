@@ -6,7 +6,7 @@ interface AppState {
   currentUser: User | null;
   isAuthenticated: boolean;
   setCurrentUser: (user: User | null) => void;
-  login: (email: string, collegeId: string) => Promise<void>;
+  login: (profile: Partial<User> & { email: string }) => Promise<void>;
   logout: () => void;
 
   // Clubs
@@ -42,7 +42,7 @@ interface AppState {
   joinRequests: JoinRequest[];
   setJoinRequests: (requests: JoinRequest[]) => void;
   addJoinRequest: (request: JoinRequest) => void;
-  updateJoinRequest: (requestId: string, status: 'accepted' | 'rejected') => void;
+  updateJoinRequest: (requestId: string, updates: Partial<JoinRequest>) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -52,22 +52,31 @@ export const useStore = create<AppState>((set, get) => ({
 
   setCurrentUser: (user) => set({ currentUser: user, isAuthenticated: !!user }),
 
-  login: async (email: string, collegeId: string) => {
-    // Mock login - in production, this would call an API
+  login: async (profile) => {
+    const existingUser = get().currentUser;
     const mockUser: User = {
-      id: '1',
-      name: 'Alex Thompson',
-      email,
-      collegeId,
-      collegeName: 'Tech University',
-      major: 'Computer Science',
-      year: 'Junior',
-      interests: ['Technology', 'Art', 'Music'],
-      clubsJoined: [],
-      clubsLeading: [],
-      eventsAttended: 0,
-      rating: 0,
-      totalTransactions: 0,
+      id: existingUser?.id || Date.now().toString(),
+      name: profile.name || existingUser?.name || 'Alex Thompson',
+      email: profile.email,
+      collegeId:
+        profile.collegeId ||
+        existingUser?.collegeId ||
+        `ID-${new Date().getFullYear().toString().slice(-2)}001`,
+      collegeName: profile.collegeName || existingUser?.collegeName || 'Tech University',
+      major: profile.major || existingUser?.major || 'Computer Science',
+      year: profile.year || existingUser?.year || 'Junior',
+      interests:
+        profile.interests && profile.interests.length > 0
+          ? profile.interests
+          : existingUser?.interests && existingUser.interests.length > 0
+          ? existingUser.interests
+          : ['Technology', 'Art', 'Music'],
+      clubsJoined: existingUser?.clubsJoined || [],
+      clubsLeading: existingUser?.clubsLeading || [],
+      eventsAttended: existingUser?.eventsAttended || 0,
+      rating: existingUser?.rating || 0,
+      totalTransactions: existingUser?.totalTransactions || 0,
+      profilePhoto: profile.profilePhoto || existingUser?.profilePhoto,
     };
     set({ currentUser: mockUser, isAuthenticated: true });
   },
@@ -179,10 +188,10 @@ export const useStore = create<AppState>((set, get) => ({
   addJoinRequest: (request) =>
     set((state) => ({ joinRequests: [...state.joinRequests, request] })),
 
-  updateJoinRequest: (requestId, status) =>
+  updateJoinRequest: (requestId, updates) =>
     set((state) => ({
       joinRequests: state.joinRequests.map((r) =>
-        r.id === requestId ? { ...r, status } : r
+        r.id === requestId ? { ...r, ...updates } : r
       ),
     })),
 }));

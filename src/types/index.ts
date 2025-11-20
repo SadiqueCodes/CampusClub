@@ -94,8 +94,10 @@ export interface JoinRequest {
   userId: string;
   userName: string;
   userPhoto?: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  initiatedBy: 'user' | 'leader';
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
   createdAt: Date;
+  respondedAt?: Date;
 }
 
 export interface SwipeProfile {

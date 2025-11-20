@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -7,8 +7,25 @@ import { useFonts } from 'expo-font';
 import { Lobster_400Regular } from '@expo-google-fonts/lobster';
 import { theme } from '../theme';
 import { useStore } from '../store';
+import { User } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const yearOptions: Array<{ value: User['year']; label: string }> = [
+  { value: 'Freshman', label: 'First Year' },
+  { value: 'Sophomore', label: 'Second Year' },
+  { value: 'Junior', label: 'Third Year' },
+  { value: 'Senior', label: 'Fourth Year' },
+];
+const interestOptions = [
+  'Technology',
+  'Design',
+  'Entrepreneurship',
+  'Sports',
+  'Music',
+  'Volunteering',
+  'Photography',
+  'Gaming',
+];
 
 export const LoginScreen: React.FC = () => {
   const [fontsLoaded] = useFonts({
@@ -25,6 +42,13 @@ export const LoginScreen: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [signUpStep, setSignUpStep] = useState(1);
+  const totalSignUpSteps = 3;
+  const [studentId, setStudentId] = useState('');
+  const [collegeName, setCollegeName] = useState('');
+  const [major, setMajor] = useState('');
+  const [selectedYear, setSelectedYear] = useState<User['year'] | ''>('');
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
   // Animation values
   const curvePosition = useRef(new Animated.Value(SCREEN_HEIGHT * 0.62)).current;
@@ -61,12 +85,73 @@ export const LoginScreen: React.FC = () => {
   }, [scrollX]);
 
   const login = useStore((state) => state.login);
+  const stepDetails = [
+    { title: 'Basic info', subtitle: 'Tell us how to reach you' },
+    { title: 'Campus details', subtitle: 'Share your program info' },
+    { title: 'Interests', subtitle: 'Pick topics you care about' },
+  ];
+
+  const resetSignUpForm = () => {
+    setSignUpStep(1);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setStudentId('');
+    setCollegeName('');
+    setMajor('');
+    setSelectedYear('');
+    setSelectedInterests([]);
+  };
+
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests((prev) =>
+      prev.includes(interest) ? prev.filter((item) => item !== interest) : [...prev, interest]
+    );
+  };
+
+  const validateSignUpStep = (step = signUpStep) => {
+    if (step === 1) {
+      if (!name.trim()) {
+        Alert.alert('Missing info', 'Please enter your full name to continue.');
+        return false;
+      }
+      if (!email.trim()) {
+        Alert.alert('Missing info', 'Please enter a valid email address.');
+        return false;
+      }
+      if (!password || password.length < 6) {
+        Alert.alert('Weak password', 'Use at least 6 characters for your password.');
+        return false;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Mismatch', 'Passwords do not match.');
+        return false;
+      }
+    } else if (step === 2) {
+      if (!collegeName.trim() || !studentId.trim() || !major.trim() || !selectedYear) {
+        Alert.alert('Missing campus info', 'Add your college, ID, major, and year.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNextSignUpStep = () => {
+    if (validateSignUpStep()) {
+      setSignUpStep((prev) => Math.min(prev + 1, totalSignUpSteps));
+    }
+  };
+
+  const handleBackSignUpStep = () => {
+    setSignUpStep((prev) => Math.max(prev - 1, 1));
+  };
 
   const handleLogin = async () => {
     if (!email || !password) return;
     setLoading(true);
     try {
-      await login(email, password);
+      await login({ email });
     } catch (error) {
       console.error('Login error:', error);
     } finally {
@@ -75,15 +160,20 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleSignUp = async () => {
-    if (!name || !email || !password || !confirmPassword) return;
-    if (password !== confirmPassword) {
-      console.error('Passwords do not match');
-      return;
-    }
+    if (!validateSignUpStep()) return;
     setLoading(true);
     try {
-      // Add sign up logic here
-      await login(email, password); // Temporarily using login
+      await login({
+        name,
+        email,
+        collegeId: studentId || `ID-${Date.now()}`,
+        collegeName: collegeName || 'My Campus',
+        major: major || 'Undeclared',
+        year: (selectedYear as User['year']) || 'Freshman',
+        interests: selectedInterests.length ? selectedInterests : ['Campus Life'],
+      });
+      resetSignUpForm();
+      setIsSignUp(false);
     } catch (error) {
       console.error('Sign up error:', error);
     } finally {
@@ -114,6 +204,289 @@ export const LoginScreen: React.FC = () => {
     ]).start(() => {
       setShowWelcome(false);
     });
+  };
+
+  const currentStepDetail = stepDetails[Math.min(signUpStep - 1, stepDetails.length - 1)] || {
+    title: '',
+    subtitle: '',
+  };
+
+  const handlePrimaryAction = () => {
+    if (loading) return;
+    if (isSignUp) {
+      if (signUpStep < totalSignUpSteps) {
+        handleNextSignUpStep();
+      } else {
+        handleSignUp();
+      }
+    } else {
+      handleLogin();
+    }
+  };
+
+  const handleToggleAuthMode = () => {
+    if (isSignUp) {
+      resetSignUpForm();
+    } else {
+      setSignUpStep(1);
+    }
+    setIsSignUp((prev) => !prev);
+  };
+
+  const renderSignInForm = () => (
+    <>
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="demo@email.com"
+            placeholderTextColor="#DDD"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Password</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor="#DDD"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+            <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.optionsRow}>
+        <TouchableOpacity style={styles.rememberMe} onPress={() => setRememberMe(!rememberMe)}>
+          <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+            {rememberMe && <Ionicons name="checkmark" size={14} color="#E372A1" />}
+          </View>
+          <Text style={styles.rememberText}>Remember Me</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity>
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  const renderStepIndicator = () => (
+    <View style={styles.stepIndicator}>
+      {Array.from({ length: totalSignUpSteps }).map((_, index) => {
+        const stepNumber = index + 1;
+        const isActive = signUpStep === stepNumber;
+        const isCompleted = signUpStep > stepNumber;
+        return (
+          <View key={stepNumber} style={styles.stepIndicatorItem}>
+            <View
+              style={[
+                styles.stepCircle,
+                (isActive || isCompleted) && styles.stepCircleActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.stepCircleText,
+                  (isActive || isCompleted) && styles.stepCircleTextActive,
+                ]}
+              >
+                {stepNumber}
+              </Text>
+            </View>
+            {stepNumber < totalSignUpSteps && (
+              <View
+                style={[
+                  styles.stepLine,
+                  signUpStep > stepNumber && styles.stepLineActive,
+                ]}
+              />
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  const renderSignUpStepContent = () => {
+    switch (signUpStep) {
+      case 1:
+        return (
+          <>
+            <Text style={styles.stepMetaText}>Step {signUpStep} of {totalSignUpSteps} • Basic info</Text>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Full Name</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="person-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="John Doe"
+                  placeholderTextColor="#DDD"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="you@college.edu"
+                  placeholderTextColor="#DDD"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Create a password"
+                  placeholderTextColor="#DDD"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirm Password</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#DDD"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        );
+      case 2:
+        return (
+          <>
+            <Text style={styles.stepMetaText}>Step {signUpStep} of {totalSignUpSteps} • Campus details</Text>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>University / College</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="school-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Tech University"
+                  placeholderTextColor="#DDD"
+                  value={collegeName}
+                  onChangeText={setCollegeName}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Student ID</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="card-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. CS2023123"
+                  placeholderTextColor="#DDD"
+                  value={studentId}
+                  onChangeText={setStudentId}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Major</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="book-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Computer Science"
+                  placeholderTextColor="#DDD"
+                  value={major}
+                  onChangeText={setMajor}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Year</Text>
+              <View style={styles.yearGrid}>
+                {yearOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.yearOption, selectedYear === option.value && styles.yearOptionSelected]}
+                    onPress={() => setSelectedYear(option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.yearOptionText,
+                        selectedYear === option.value && styles.yearOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </>
+        );
+      case 3:
+      default:
+        return (
+          <>
+            <Text style={styles.stepMetaText}>Step {signUpStep} of {totalSignUpSteps} • Interests</Text>
+            <Text style={styles.stepHelperText}>Choose a few interests so we can personalize club suggestions.</Text>
+            <View style={styles.chipsContainer}>
+              {interestOptions.map((interest) => {
+                const active = selectedInterests.includes(interest);
+                return (
+                  <TouchableOpacity
+                    key={interest}
+                    style={[styles.chip, active && styles.chipSelected]}
+                    onPress={() => toggleInterest(interest)}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextSelected]}>{interest}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        );
+    }
   };
 
   if (!fontsLoaded) {
@@ -436,118 +809,44 @@ colors={['#B06579', '#CE678A', '#E372A1']}
                 style={styles.formScroll}
                 contentContainerStyle={styles.formScrollContent}
               >
-
-                {/* Name Input (Sign Up Only) */}
-                {isSignUp && (
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Full Name</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="person-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.input}
-                        placeholder="John Doe"
-                        placeholderTextColor="#DDD"
-                        value={name}
-                        onChangeText={setName}
-                        autoCapitalize="words"
-                      />
-                    </View>
-                  </View>
-                )}
-
-                {/* Email Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Email</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="demo@email.com"
-                      placeholderTextColor="#DDD"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-
-                {/* Password Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter your password"
-                      placeholderTextColor="#DDD"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={!showPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#B2BEB5" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Confirm Password Input (Sign Up Only) */}
-                {isSignUp && (
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Confirm Password</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Confirm your password"
-                        placeholderTextColor="#DDD"
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry={!showConfirmPassword}
-                      />
-                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                        <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#B2BEB5" />
+                {isSignUp ? (
+                  <>
+                    {renderStepIndicator()}
+                    <Text style={styles.stepTitleText}>{currentStepDetail.title}</Text>
+                    <Text style={styles.stepSubtitleText}>{currentStepDetail.subtitle}</Text>
+                    {renderSignUpStepContent()}
+                    {signUpStep > 1 && (
+                      <TouchableOpacity style={styles.backStepButton} onPress={handleBackSignUpStep}>
+                        <Ionicons name="arrow-back" size={16} color="#B06579" />
+                        <Text style={styles.backStepText}>Back</Text>
                       </TouchableOpacity>
-                    </View>
-                  </View>
+                    )}
+                  </>
+                ) : (
+                  renderSignInForm()
                 )}
 
-                {/* Remember Me & Forgot Password (Sign In Only) */}
-                {!isSignUp && (
-                  <View style={styles.optionsRow}>
-                    <TouchableOpacity
-                      style={styles.rememberMe}
-                      onPress={() => setRememberMe(!rememberMe)}
-                    >
-                      <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                        {rememberMe && <Ionicons name="checkmark" size={14} color="#E372A1" />}
-                      </View>
-                      <Text style={styles.rememberText}>Remember Me</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity>
-                      <Text style={styles.forgotText}>Forgot Password?</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Login/Sign Up Button */}
                 <TouchableOpacity
                   style={[styles.loginButton, isSignUp && { marginTop: 24 }]}
-                  onPress={isSignUp ? handleSignUp : handleLogin}
+                  onPress={handlePrimaryAction}
                   disabled={loading}
                 >
                   <Text style={styles.loginButtonText}>
-                    {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Login'}
+                    {loading
+                      ? 'Loading...'
+                      : isSignUp
+                      ? signUpStep === totalSignUpSteps
+                        ? 'Create Account'
+                        : 'Next'
+                      : 'Login'}
                   </Text>
                 </TouchableOpacity>
 
-                {/* Toggle Sign In/Sign Up Link */}
                 <View style={styles.signupContainer}>
                   <Text style={styles.signupText}>
                     {isSignUp ? 'Already have an Account? ' : "Don't have an Account? "}
                   </Text>
-                  <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)}>
+                  <TouchableOpacity onPress={handleToggleAuthMode}>
                     <Text style={styles.signupLink}>{isSignUp ? 'Sign in' : 'Sign up'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -747,6 +1046,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#E372A1',
     borderRadius: 2,
   },
+  stepIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  stepIndicatorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  stepCircleActive: {
+    borderColor: '#E372A1',
+    backgroundColor: '#E372A1',
+  },
+  stepCircleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  stepCircleTextActive: {
+    color: '#fff',
+  },
+  stepLine: {
+    width: 32,
+    height: 2,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 6,
+  },
+  stepLineActive: {
+    backgroundColor: '#E372A1',
+  },
+  stepTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  stepSubtitleText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  stepMetaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  stepHelperText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
   inputContainer: {
     marginBottom: 16,
   },
@@ -776,6 +1137,54 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 4,
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  yearOption: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  yearOptionSelected: {
+    borderColor: '#E372A1',
+    backgroundColor: '#FFF5F8',
+  },
+  yearOptionText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  yearOptionTextSelected: {
+    color: '#B06579',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  chipSelected: {
+    backgroundColor: '#E372A1',
+    borderColor: '#E372A1',
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: '#fff',
   },
   optionsRow: {
     flexDirection: 'row',
@@ -809,6 +1218,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#E372A1',
     fontWeight: '500',
+  },
+  backStepButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  backStepText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B06579',
   },
   loginButton: {
     backgroundColor: '#E372A1',
