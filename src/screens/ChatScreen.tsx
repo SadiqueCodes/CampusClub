@@ -8,65 +8,24 @@ import { Chat } from '../types';
 
 export const ChatScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { chats, currentUser, setChats } = useStore();
+  const { chats, currentUser } = useStore();
+  const fetchChats = useStore((s) => s.fetchChats);
 
   useEffect(() => {
-    if (chats.length === 0 && currentUser) {
-      // Mock chats
-      setChats([
-        {
-          id: 'chat1',
-          type: 'group',
-          name: 'Art Appreciation Club',
-          participantIds: [currentUser.id, '2', '3'],
-          lastMessage: {
-            id: '1',
-            chatId: 'chat1',
-            senderId: '2',
-            senderName: 'Sarah',
-            text: "Let's meet at 5pm tomorrow!",
-            timestamp: new Date(Date.now() - 2 * 60 * 1000),
-          },
-          lastMessageTime: new Date(Date.now() - 2 * 60 * 1000),
-          unreadCount: 0,
-          clubId: '1',
-        },
-        {
-          id: 'chat2',
-          type: 'group',
-          name: 'Coding Enthusiasts',
-          participantIds: [currentUser.id, '3'],
-          lastMessage: {
-            id: '2',
-            chatId: 'chat2',
-            senderId: '3',
-            senderName: 'Mike',
-            text: 'Check out this new framework',
-            timestamp: new Date(Date.now() - 15 * 60 * 1000),
-          },
-          lastMessageTime: new Date(Date.now() - 15 * 60 * 1000),
-          unreadCount: 2,
-          clubId: '2',
-        },
-        {
-          id: 'chat3',
-          type: 'direct',
-          participantIds: [currentUser.id, '4'],
-          lastMessage: {
-            id: '3',
-            chatId: 'chat3',
-            senderId: currentUser.id,
-            senderName: currentUser.name,
-            text: 'Is the camera still available?',
-            timestamp: new Date(Date.now() - 60 * 60 * 1000),
-          },
-          lastMessageTime: new Date(Date.now() - 60 * 60 * 1000),
-          unreadCount: 0,
-          marketplaceItemId: '1',
-        },
-      ]);
-    }
-  }, []);
+    if (!currentUser) return;
+    let mounted = true;
+    const fn = async () => {
+      try {
+        await fetchChats();
+      } catch (err) {
+        if (mounted) console.error('fetchChats error', err);
+      }
+    };
+    fn();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.id]);
 
   const formatTime = (date: Date): string => {
     const now = new Date();

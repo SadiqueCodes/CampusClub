@@ -7,6 +7,8 @@ import { Input } from '../components';
 import { SwipeCard } from '../components/SwipeCard';
 import { theme } from '../theme';
 import { useStore } from '../store';
+import supabase from '../lib/supabase';
+import api from '../lib/api';
 import { Club, ClubType, User } from '../types';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -23,7 +25,7 @@ export const CreateClubScreen: React.FC = () => {
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [showInterestMenu, setShowInterestMenu] = useState(false);
   const [filterMenuCoords, setFilterMenuCoords] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const filterButtonRef = useRef<TouchableOpacity | null>(null);
+  const filterButtonRef = useRef<any>(null);
 
   const currentUser = useStore((state) => state.currentUser);
   const addClub = useStore((state) => state.addClub);
@@ -40,54 +42,42 @@ export const CreateClubScreen: React.FC = () => {
   const [activeClubId, setActiveClubId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
-  // Mock users for swiping
-  const [potentialMembers] = useState<User[]>([
-    {
-      id: '10',
-      name: 'Sarah Johnson',
-      email: 'sarah@college.edu',
-      collegeId: 'CS202301',
-      collegeName: 'Tech University',
-      major: 'Computer Science',
-      year: 'Junior',
-      interests: ['Art', 'Photography', 'Design', 'Music'],
-      clubsJoined: ['1', '2', '3'],
-      clubsLeading: [],
-      eventsAttended: 12,
-      rating: 4.8,
-      totalTransactions: 5,
-    },
-    {
-      id: '11',
-      name: 'Mike Chen',
-      email: 'mike@college.edu',
-      collegeId: 'CS202302',
-      collegeName: 'Tech University',
-      major: 'Mathematics',
-      year: 'Senior',
-      interests: ['Coding', 'Gaming', 'Sports'],
-      clubsJoined: ['2'],
-      clubsLeading: [],
-      eventsAttended: 8,
-      rating: 4.5,
-      totalTransactions: 3,
-    },
-    {
-      id: '12',
-      name: 'Emma Wilson',
-      email: 'emma@college.edu',
-      collegeId: 'CS202303',
-      collegeName: 'Tech University',
-      major: 'Music',
-      year: 'Sophomore',
-      interests: ['Music', 'Art', 'Theater'],
-      clubsJoined: ['1'],
-      clubsLeading: [],
-      eventsAttended: 15,
-      rating: 5.0,
-      totalTransactions: 7,
-    },
-  ]);
+  // Potential members — load from Supabase profiles (exclude current user)
+  const [potentialMembers, setPotentialMembers] = useState<User[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').limit(30);
+        if (!error && data) {
+          // Filter out current user
+          const list = (data as any[])
+            .filter((p) => p.id !== currentUser?.id)
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              email: p.email,
+              collegeId: p.college_id || p.collegeId || '',
+              collegeName: p.college_name || p.collegeName || '',
+              major: p.major || '',
+              year: p.year || 'Freshman',
+              interests: p.interests || [],
+              clubsJoined: p.clubs_joined || p.clubsJoined || [],
+              clubsLeading: p.clubs_leading || p.clubsLeading || [],
+              eventsAttended: p.events_attended || 0,
+              rating: p.rating || 0,
+              totalTransactions: p.total_transactions || 0,
+            })) as User[];
+          setPotentialMembers(list);
+          return;
+        }
+      } catch (e) {
+        console.warn('fetch profiles error', e);
+      }
+      // Fallback: keep empty list
+      setPotentialMembers([]);
+    })();
+  }, [currentUser?.id]);
 
   const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
 
@@ -185,48 +175,125 @@ export const CreateClubScreen: React.FC = () => {
   const handleCreateClub = () => {
     if (!clubName || !clubDescription || !currentUser) return;
 
-    const newClub: Club = {
-      id: Date.now().toString(),
-      name: clubName,
-      type: clubType,
-      description: clubDescription,
-      leaderId: currentUser.id,
-      leaderName: currentUser.name,
-      memberIds: [currentUser.id],
-      memberCount: 1,
-      createdAt: new Date(),
-      groupChatId: `chat_${Date.now()}`,
-      logoEmoji: '👥',
-      upcomingEvents: 0,
-    };
+    (async () => {
+      try {
+        // Create club on the backend
+        const payload = { name: clubName, type: clubType, description: clubDescription };
+        const created = await api.createClub(payload);
+        const createdClub = (created as any).data || created;
 
-    addClub(newClub);
+        // Create a group chat for the club on the backend
+        const chatPayload = { participant_ids: [currentUser.id], name: clubName, club_id: createdClub.id };
+        const chatRes = await api.createChat(chatPayload);
+        const createdChat = (chatRes as any).data || chatRes;
 
-    // Create group chat
-    addChat({
-      id: newClub.groupChatId,
-      type: 'group',
-      name: newClub.name,
-      participantIds: [currentUser.id],
-      avatarEmoji: '👥',
-      lastMessage: {
-        id: '1',
-        chatId: newClub.groupChatId,
-        senderId: 'system',
-        senderName: 'System',
-        text: `${newClub.name} group created!`,
-        timestamp: new Date(),
-      },
-      lastMessageTime: new Date(),
-      unreadCount: 0,
-      clubId: newClub.id,
-    });
+        // Update club to set group_chat_id
+        try {
+          await api.updateClub(createdClub.id, { group_chat_id: createdChat.id });
+        } catch (e) {
+          // Non-fatal: continue even if updating club group_chat_id fails
+          console.warn('Failed to update club with group_chat_id', e);
+        }
 
-    setActiveClubId(newClub.id);
-    setShowCreateModal(false);
-    setIsSwipeMode(true);
-    setCurrentProfileIndex(0);
-    resetForm();
+        // Push to local store
+        const clubToStore: Club = {
+          id: createdClub.id,
+          name: createdClub.name,
+          type: createdClub.type,
+          description: createdClub.description,
+          leaderId: createdClub.leader_id || currentUser.id,
+          leaderName: createdClub.leader_name || currentUser.name,
+          memberIds: createdClub.member_ids || [currentUser.id],
+          memberCount: createdClub.member_count || 1,
+          createdAt: createdClub.created_at ? new Date(createdClub.created_at) : new Date(),
+          groupChatId: createdClub.group_chat_id || createdChat.id,
+          logoEmoji: createdClub.logo_emoji || '👥',
+          upcomingEvents: createdClub.upcoming_events || 0,
+        } as Club;
+
+        addClub(clubToStore);
+
+        const chatToStore = {
+          id: createdChat.id,
+          type: createdChat.type || 'group',
+          name: createdChat.name || clubToStore.name,
+          participantIds: createdChat.participant_ids || [currentUser.id],
+          avatarEmoji: createdChat.avatar_emoji || '👥',
+          lastMessage: createdChat.last_message
+            ? {
+                id: createdChat.last_message.id,
+                chatId: createdChat.id,
+                senderId: createdChat.last_message.sender_id,
+                senderName: createdChat.last_message.sender_name,
+                text: createdChat.last_message.text,
+                timestamp: createdChat.last_message.timestamp ? new Date(createdChat.last_message.timestamp) : new Date(),
+              }
+            : {
+                id: '1',
+                chatId: createdChat.id,
+                senderId: 'system',
+                senderName: 'System',
+                text: `${clubToStore.name} group created!`,
+                timestamp: new Date(),
+              },
+          lastMessageTime: createdChat.last_message_time ? new Date(createdChat.last_message_time) : new Date(),
+          unreadCount: createdChat.unread_count || 0,
+          clubId: clubToStore.id,
+        } as any;
+
+        addChat(chatToStore);
+
+        setActiveClubId(clubToStore.id);
+        setShowCreateModal(false);
+        setIsSwipeMode(true);
+        setCurrentProfileIndex(0);
+        resetForm();
+      } catch (e) {
+        console.warn('Create club backend flow failed, falling back to local creation', e);
+        // Fallback to local-only behavior
+        const newClub: Club = {
+          id: Date.now().toString(),
+          name: clubName,
+          type: clubType,
+          description: clubDescription,
+          leaderId: currentUser.id,
+          leaderName: currentUser.name,
+          memberIds: [currentUser.id],
+          memberCount: 1,
+          createdAt: new Date(),
+          groupChatId: `chat_${Date.now()}`,
+          logoEmoji: '👥',
+          upcomingEvents: 0,
+        };
+
+        addClub(newClub);
+        // Create local chat
+        addChat({
+          id: newClub.groupChatId,
+          type: 'group',
+          name: newClub.name,
+          participantIds: [currentUser.id],
+          avatarEmoji: '👥',
+          lastMessage: {
+            id: '1',
+            chatId: newClub.groupChatId,
+            senderId: 'system',
+            senderName: 'System',
+            text: `${newClub.name} group created!`,
+            timestamp: new Date(),
+          },
+          lastMessageTime: new Date(),
+          unreadCount: 0,
+          clubId: newClub.id,
+        });
+
+        setActiveClubId(newClub.id);
+        setShowCreateModal(false);
+        setIsSwipeMode(true);
+        setCurrentProfileIndex(0);
+        resetForm();
+      }
+    })();
   };
 
   const resetForm = () => {

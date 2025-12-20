@@ -86,6 +86,10 @@ export interface Message {
   text: string;
   timestamp: Date;
   attachments?: string[];
+  // Optional delivery status for optimistic UI and reconciliation
+  status?: 'pending' | 'sent' | 'failed';
+  // Temporary client id used before server assigns a permanent id
+  tempId?: string;
 }
 
 export interface JoinRequest {

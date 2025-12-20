@@ -14,6 +14,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { clubs, events, marketplaceItems, currentUser, joinRequests } = useStore();
+  const fetchInitialData = useStore((s) => s.fetchInitialData);
   const [fontsLoaded] = useFonts({
     Lobster_400Regular,
   });
@@ -70,86 +71,21 @@ export const HomeScreen: React.FC = () => {
   const notificationCount =
     pendingIncomingRequests.length + pendingMyRequests.length + invitationsForMe.length;
 
-  // Mock data initialization
+  // Fetch live data from Supabase (or backend) — re-run when currentUser changes
   useEffect(() => {
-    if (events.length === 0) {
-      useStore.getState().setEvents([
-        {
-          id: '1',
-          title: 'Tech Fest 2024',
-          description: 'Annual technology festival',
-          clubId: '2',
-          clubName: 'Tech Club',
-          date: new Date('2024-03-15'),
-          time: '3:00 PM',
-          location: 'Main Auditorium',
-          interestedUserIds: [],
-          interestedCount: 52,
-          createdBy: '3',
-        },
-        {
-          id: '2',
-          title: 'Art Exhibition',
-          description: 'Student art showcase',
-          clubId: '1',
-          clubName: 'Art Club',
-          date: new Date('2024-03-18'),
-          time: '10:00 AM',
-          location: 'Gallery Hall',
-          interestedUserIds: [],
-          interestedCount: 38,
-          createdBy: '2',
-        },
-      ]);
-    }
-
-    if (marketplaceItems.length === 0) {
-      useStore.getState().setMarketplaceItems([
-        {
-          id: '1',
-          title: 'Camera',
-          description: 'Canon DSLR',
-          price: 120,
-          images: [],
-          sellerId: '2',
-          sellerName: 'Sarah',
-          sellerMajor: 'CS',
-          sellerYear: 'Junior',
-          sellerRating: 4.8,
-          status: 'active',
-          createdAt: new Date(),
-        },
-        {
-          id: '2',
-          title: 'Books',
-          description: 'Textbooks',
-          price: 25,
-          images: [],
-          sellerId: '3',
-          sellerName: 'Mike',
-          sellerMajor: 'Math',
-          sellerYear: 'Senior',
-          sellerRating: 4.5,
-          status: 'active',
-          createdAt: new Date(),
-        },
-        {
-          id: '3',
-          title: 'Headphones',
-          description: 'Sony WH-1000XM4',
-          price: 80,
-          images: [],
-          sellerId: '4',
-          sellerName: 'Emma',
-          sellerMajor: 'Music',
-          sellerYear: 'Sophomore',
-          sellerRating: 5.0,
-          status: 'active',
-          createdAt: new Date(),
-        },
-      ]);
-    }
-  }, []);
+    let mounted = true;
+    const fn = async () => {
+      try {
+        await fetchInitialData();
+      } catch (err) {
+        if (mounted) console.error('Error fetching initial data', err);
+      }
+    };
+    fn();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.id]);
 
   const getClubIcon = (type: string) => {
     switch (type) {

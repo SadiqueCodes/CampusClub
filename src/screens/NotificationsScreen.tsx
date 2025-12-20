@@ -8,7 +8,7 @@ import { JoinRequest } from '../types';
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { joinRequests, clubs, currentUser, updateJoinRequest, updateClub, chats, setChats } =
+  const { joinRequests, clubs, currentUser, updateJoinRequest, updateClub, chats, updateChat } =
     useStore();
   const myId = currentUser?.id || '';
 
@@ -71,13 +71,7 @@ export const NotificationsScreen: React.FC = () => {
 
     const clubChat = chats.find((chat) => chat.clubId === clubId);
     if (clubChat && !clubChat.participantIds.includes(userId)) {
-      setChats(
-        chats.map((chat) =>
-          chat.id === clubChat.id
-            ? { ...chat, participantIds: [...chat.participantIds, userId] }
-            : chat
-        )
-      );
+      updateChat(clubChat.id, { participantIds: [...clubChat.participantIds, userId] });
     }
   };
 
@@ -173,7 +167,7 @@ export const NotificationsScreen: React.FC = () => {
           {summaryTiles.map((tile, index) => (
             <LinearGradient
               key={tile.key}
-              colors={tile.colors}
+              colors={tile.colors as any}
               style={[
                 styles.summaryTile,
                 { marginRight: index === summaryTiles.length - 1 ? 0 : 12 },
@@ -200,50 +194,46 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>Invitations for you</Text>
           </View>
-          {receivedInvitations.length === 0
-            ? renderEmptyState('No invites yet. Club leads can invite you to join.')
-            : receivedInvitations.map((request) => {
+          {receivedInvitations.length === 0 ? (
+            renderEmptyState('No invites yet. Club leads can invite you to join.')
+          ) : (
+            receivedInvitations.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               return (
                 <View key={request.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.clubAvatar}>
-                        <Text style={styles.clubAvatarText}>
-                          {club?.name?.charAt(0).toUpperCase() || 'C'}
-                        </Text>
-                      </View>
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitle}>{club?.name || 'Club unavailable'}</Text>
-                        <Text style={styles.cardSubtitle}>
-                          Invited {formatRequestDate(request.createdAt)}
-                          {request.respondedAt
-                            ? ` • Updated ${formatRequestDate(request.respondedAt)}`
-                            : ''}
-                        </Text>
-                      </View>
-                      {renderStatusBadge(request)}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.clubAvatar}>
+                      <Text style={styles.clubAvatarText}>{club?.name?.charAt(0).toUpperCase() || 'C'}</Text>
                     </View>
-                    {request.status === 'pending' && (
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={styles.declineButton}
-                          onPress={() => handleInvitationDecision(request, 'rejected')}
-                        >
-                          <Text style={styles.declineButtonText}>Decline</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.acceptButton}
-                          onPress={() => handleInvitationDecision(request, 'accepted')}
-                        >
-                          <Text style={styles.acceptButtonText}>Accept</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{club?.name || 'Club unavailable'}</Text>
+                      <Text style={styles.cardSubtitle}>
+                        Invited {formatRequestDate(request.createdAt)}
+                        {request.respondedAt ? ` • Updated ${formatRequestDate(request.respondedAt)}` : ''}
+                      </Text>
+                    </View>
+                    {renderStatusBadge(request)}
                   </View>
-                );
-              })}
+                  {request.status === 'pending' && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={styles.declineButton}
+                        onPress={() => handleInvitationDecision(request, 'rejected')}
+                      >
+                        <Text style={styles.declineButtonText}>Decline</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.acceptButton}
+                        onPress={() => handleInvitationDecision(request, 'accepted')}
+                      >
+                        <Text style={styles.acceptButtonText}>Accept</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               );
-            })}
+            })
+          )}
         </View>
 
         <View style={styles.section}>
@@ -253,42 +243,35 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>My applications</Text>
           </View>
-          {myApplications.length === 0
-            ? renderEmptyState("You haven't requested to join any clubs yet.")
-            : myApplications.map((request) => {
+          {myApplications.length === 0 ? (
+            renderEmptyState("You haven't requested to join any clubs yet.")
+          ) : (
+            myApplications.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               return (
                 <View key={request.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.clubAvatar}>
-                        <Text style={styles.clubAvatarText}>
-                          {club?.name?.charAt(0).toUpperCase() || 'C'}
-                        </Text>
-                      </View>
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitle}>{club?.name || 'Club unavailable'}</Text>
-                        <Text style={styles.cardSubtitle}>
-                          Applied {formatRequestDate(request.createdAt)}
-                          {request.respondedAt
-                            ? ` • Updated ${formatRequestDate(request.respondedAt)}`
-                            : ''}
-                        </Text>
-                      </View>
-                      {renderStatusBadge(request)}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.clubAvatar}>
+                      <Text style={styles.clubAvatarText}>{club?.name?.charAt(0).toUpperCase() || 'C'}</Text>
                     </View>
-                    {request.status === 'pending' && (
-                      <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => handleCancelRequest(request)}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel request</Text>
-                      </TouchableOpacity>
-                    )}
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{club?.name || 'Club unavailable'}</Text>
+                      <Text style={styles.cardSubtitle}>
+                        Applied {formatRequestDate(request.createdAt)}
+                        {request.respondedAt ? ` • Updated ${formatRequestDate(request.respondedAt)}` : ''}
+                      </Text>
+                    </View>
+                    {renderStatusBadge(request)}
                   </View>
-                );
-              })}
+                  {request.status === 'pending' && (
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelRequest(request)}>
+                      <Text style={styles.cancelButtonText}>Cancel request</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               );
-            })}
+            })
+          )}
         </View>
 
         <View style={styles.section}>
@@ -298,49 +281,42 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>Incoming requests (your clubs)</Text>
           </View>
-          {incomingRequests.length === 0
-            ? renderEmptyState('No new join requests yet. Members will appear here.')
-            : incomingRequests.map((request) => {
+          {incomingRequests.length === 0 ? (
+            renderEmptyState('No new join requests yet. Members will appear here.')
+          ) : (
+            incomingRequests.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               const initial = request.userName?.charAt(0).toUpperCase() || '?';
               return (
-                  <View key={request.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.userAvatar}>
-                        {request.userPhoto ? (
-                          <Image source={{ uri: request.userPhoto }} style={styles.userImage} />
-                        ) : (
-                          <Text style={styles.userAvatarText}>{initial}</Text>
-                        )}
-                      </View>
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitle}>{request.userName}</Text>
-                        <Text style={styles.cardSubtitle}>
-                          wants to join {club?.name || 'your club'}
-                        </Text>
-                      </View>
-                      {renderStatusBadge(request)}
+                <View key={request.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.userAvatar}>
+                      {request.userPhoto ? (
+                        <Image source={{ uri: request.userPhoto }} style={styles.userImage} />
+                      ) : (
+                        <Text style={styles.userAvatarText}>{initial}</Text>
+                      )}
                     </View>
-                    {request.status === 'pending' && (
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={styles.declineButton}
-                          onPress={() => handleApplicationDecision(request, 'rejected')}
-                        >
-                          <Text style={styles.declineButtonText}>Decline</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.acceptButton}
-                          onPress={() => handleApplicationDecision(request, 'accepted')}
-                        >
-                          <Text style={styles.acceptButtonText}>Accept</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{request.userName}</Text>
+                      <Text style={styles.cardSubtitle}>wants to join {club?.name || 'your club'}</Text>
+                    </View>
+                    {renderStatusBadge(request)}
                   </View>
-                );
-              })}
-            })}
+                  {request.status === 'pending' && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity style={styles.declineButton} onPress={() => handleApplicationDecision(request, 'rejected')}>
+                        <Text style={styles.declineButtonText}>Decline</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.acceptButton} onPress={() => handleApplicationDecision(request, 'accepted')}>
+                        <Text style={styles.acceptButtonText}>Accept</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.section}>
@@ -350,38 +326,35 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>Invites you sent</Text>
           </View>
-          {pendingSentInvites.length === 0
-            ? renderEmptyState('Invite members from Find Members to see them here.')
-            : pendingSentInvites.map((request) => {
+          {pendingSentInvites.length === 0 ? (
+            renderEmptyState('Invite members from Find Members to see them here.')
+          ) : (
+            pendingSentInvites.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               const initial = request.userName?.charAt(0).toUpperCase() || '?';
               return (
                 <View key={request.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.userAvatar}>
-                        <Text style={styles.userAvatarText}>{initial}</Text>
-                      </View>
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardTitle}>{request.userName}</Text>
-                        <Text style={styles.cardSubtitle}>
-                          Invited to {club?.name || 'your club'} on{' '}
-                          {formatRequestDate(request.createdAt)}
-                        </Text>
-                      </View>
-                      {renderStatusBadge(request)}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>{initial}</Text>
                     </View>
-                    {request.status === 'pending' && (
-                      <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => handleCancelInvite(request)}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel invite</Text>
-                      </TouchableOpacity>
-                    )}
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{request.userName}</Text>
+                      <Text style={styles.cardSubtitle}>
+                        Invited to {club?.name || 'your club'} on {formatRequestDate(request.createdAt)}
+                      </Text>
+                    </View>
+                    {renderStatusBadge(request)}
                   </View>
-                );
-              })}
-            })}
+                  {request.status === 'pending' && (
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelInvite(request)}>
+                      <Text style={styles.cancelButtonText}>Cancel invite</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </View>

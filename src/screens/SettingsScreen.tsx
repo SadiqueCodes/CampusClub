@@ -5,7 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../store';
 
-const YEAR_OPTIONS = [
+import type { User } from '../types';
+
+const YEAR_OPTIONS: Array<{ label: string; value: User['year'] }> = [
   { label: 'First Year', value: 'Freshman' },
   { label: 'Second Year', value: 'Sophomore' },
   { label: 'Third Year', value: 'Junior' },

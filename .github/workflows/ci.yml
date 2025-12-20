@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, feat/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck --if-present
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          npm ci
+
+      - name: Typecheck backend
+        run: |
+          cd backend
+          npm run typecheck

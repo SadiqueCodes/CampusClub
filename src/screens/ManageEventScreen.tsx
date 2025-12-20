@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Event } from '../types';
+import { Event, User } from '../types';
 import { useStore } from '../store';
+import supabase from '../lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -49,12 +50,28 @@ export const ManageEventScreen: React.FC = () => {
     return null;
   }
 
-  // Mock registered users data
-  const registeredUsers = [
-    { id: '1', name: 'Sarah Johnson', major: 'Computer Science', year: 'Junior', photo: '' },
-    { id: '2', name: 'Mike Chen', major: 'Engineering', year: 'Senior', photo: '' },
-    { id: '3', name: 'Emma Wilson', major: 'Business', year: 'Sophomore', photo: '' },
-  ];
+  const [registeredUsers, setRegisteredUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Try to load profiles for interested users if available
+        const interestedIds = (event as any)?.interestedUserIds || [];
+        if (interestedIds && interestedIds.length) {
+          const { data, error } = await supabase.from('profiles').select('*').in('id', interestedIds as string[]).limit(50);
+          if (!error && data) {
+            const mapped = (data as any[]).map((p) => ({ id: p.id, name: p.name, major: p.major || '', year: p.year || 'Freshman', profilePhoto: p.profile_photo || '' } as User));
+            setRegisteredUsers(mapped);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('fetch registered users error', e);
+      }
+      // Fallback: empty list when no attendee profiles are available
+      setRegisteredUsers([]);
+    })();
+  }, [event]);
 
   const handleSaveChanges = () => {
     // Update the event in the store

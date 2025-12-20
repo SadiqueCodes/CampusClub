@@ -14,6 +14,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -37,10 +38,12 @@ export const ChatDetailScreen: React.FC = () => {
     currentUser,
     getMessagesForChat,
     addMessage,
-    setChats,
+    updateChat,
+    fetchMessagesForChat,
     clubs,
     updateClub,
     events,
+    sendMessage,
   } = useStore();
 
   const [messageText, setMessageText] = useState('');
@@ -55,7 +58,7 @@ export const ChatDetailScreen: React.FC = () => {
   const [pendingDescription, setPendingDescription] = useState('');
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const flatListRef = useRef<FlatList>(null);
-  const moreButtonRef = useRef<TouchableOpacity | null>(null);
+  const moreButtonRef = useRef<any>(null);
 
   const chat = chats.find((c) => c.id === chatId);
   const messages = getMessagesForChat(chatId);
@@ -71,18 +74,28 @@ export const ChatDetailScreen: React.FC = () => {
   }, [chat]);
 
   useEffect(() => {
-    if (messages.length === 0 && currentUser && chat) {
-      const systemMessage: Message = {
-        id: `msg_${Date.now()}`,
-        chatId,
-        senderId: 'system',
-        senderName: 'System',
-        text: `Welcome to ${chat.name || 'the chat'}!`,
-        timestamp: new Date(),
-      };
-      addMessage(chatId, systemMessage);
+    // Load messages for this chat from backend
+    if (currentUser && chat) {
+      fetchMessagesForChat(chatId);
     }
-  }, []);
+
+    // Subscribe to realtime messages for this chat while screen is active
+    if (chat) {
+      try {
+        useStore.getState().subscribeToChatMessages(chatId);
+      } catch (e) {
+        console.warn('subscribeToChatMessages failed', e);
+      }
+    }
+
+    return () => {
+      try {
+        useStore.getState().unsubscribeFromChatMessages(chatId);
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [chatId, currentUser, chat]);
 
   if (!chat) {
     return (
@@ -95,21 +108,20 @@ export const ChatDetailScreen: React.FC = () => {
   const handleSendMessage = () => {
     if (!messageText.trim() || !currentUser) return;
 
-    const newMessage: Message = {
-      id: `msg_${Date.now()}`,
-      chatId,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      text: messageText.trim(),
-      timestamp: new Date(),
-    };
-
-    addMessage(chatId, newMessage);
+    const bodyText = messageText.trim();
     setMessageText('');
-
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    // Use store's optimistic sender which will add a pending message and handle retries
+    (async () => {
+      try {
+        await sendMessage(chatId, bodyText);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } catch (err: any) {
+        console.error('sendMessage wrapper error', err);
+        Alert.alert('Message failed', 'Could not send message. It will be retried automatically.');
+      }
+    })();
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -131,6 +143,17 @@ export const ChatDetailScreen: React.FC = () => {
           <Text style={[styles.messageText, isOwnMessage ? styles.ownMessageText : styles.otherMessageText]}>
             {item.text}
           </Text>
+          {item.status === 'pending' && (
+            <View style={styles.pendingRow}>
+              <ActivityIndicator size="small" color="#6B7280" />
+              <Text style={styles.messageStatus}> Sending…</Text>
+            </View>
+          )}
+          {item.status === 'failed' && (
+            <TouchableOpacity onPress={() => useStore.getState().resendMessage(chatId, item.id)} style={styles.failedBadge}>
+              <Text style={styles.failedText}>Failed — Tap to retry</Text>
+            </TouchableOpacity>
+          )}
           <Text style={[styles.messageTime, isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime]}>
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
@@ -163,16 +186,7 @@ export const ChatDetailScreen: React.FC = () => {
   };
 
   const updateChatParticipants = (updatedMembers: string[]) => {
-    setChats(
-      chats.map((c) =>
-        c.id === chat.id
-          ? {
-              ...c,
-              participantIds: updatedMembers,
-            }
-          : c
-      )
-    );
+    updateChat(chat.id, { participantIds: updatedMembers });
   };
 
   const handleRemoveMember = (memberId: string) => {
@@ -204,16 +218,7 @@ export const ChatDetailScreen: React.FC = () => {
     if (!club || !pendingName.trim()) return;
     const name = pendingName.trim();
     updateClub(club.id, { name });
-    setChats(
-      chats.map((c) =>
-        c.id === chat.id
-          ? {
-              ...c,
-              name,
-            }
-          : c
-      )
-    );
+    updateChat(chat.id, { name });
     setShowRenameModal(false);
   };
 
@@ -225,17 +230,7 @@ export const ChatDetailScreen: React.FC = () => {
   };
 
   const handleSelectAvatar = (emoji: string) => {
-    setChats(
-      chats.map((c) =>
-        c.id === chat.id
-          ? {
-              ...c,
-              avatarEmoji: emoji,
-              avatarImage: undefined,
-            }
-          : c
-      )
-    );
+    updateChat(chat.id, { avatarEmoji: emoji, avatarImage: undefined });
     if (club) {
       updateClub(club.id, { logoEmoji: emoji, logo: undefined });
     }
@@ -256,17 +251,7 @@ export const ChatDetailScreen: React.FC = () => {
     });
     if (!result.canceled && result.assets?.length) {
       const uri = result.assets[0].uri;
-      setChats(
-        chats.map((c) =>
-          c.id === chat.id
-            ? {
-                ...c,
-                avatarImage: uri,
-                avatarEmoji: undefined,
-              }
-            : c
-        )
-      );
+      updateChat(chat.id, { avatarImage: uri, avatarEmoji: undefined });
       if (club) {
         updateClub(club.id, { logo: uri, logoEmoji: undefined });
       }
@@ -362,7 +347,7 @@ export const ChatDetailScreen: React.FC = () => {
             style={styles.moreButton}
             onPress={() => {
               if (moreButtonRef.current) {
-                moreButtonRef.current.measureInWindow((x, y, width, height) => {
+                moreButtonRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
                   setMenuPosition({ x, y, width, height });
                   setShowActions(true);
                 });
@@ -883,23 +868,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#E372A1',
   },
-  memberInfo: {
+  messageStatus: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    marginTop: 6,
   },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FDF2F8',
-    alignItems: 'center',
-    justifyContent: 'center',
+  failedBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
-  memberAvatarText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#E372A1',
+  failedText: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
   },
   memberName: {
     fontSize: 15,

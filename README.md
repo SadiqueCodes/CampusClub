@@ -83,6 +83,30 @@ npm run android
 npm run web
 ```
 
+## Connecting to Supabase (frontend)
+
+To use a real backend instead of the bundled mock data, configure Supabase for the frontend:
+
+1. Install the Supabase JS client in the project root:
+
+```bash
+cd /Users/Sadique/CampusClub
+npm install @supabase/supabase-js
+```
+
+2. Add your Supabase anon key and URL to the app environment. Copy `.env.example` to `.env` and set:
+
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+```
+
+For Expo, you can inject these as runtime config or use a library to load env vars during bundling. Keep anon keys out of public repos.
+
+3. The app includes a Supabase wrapper at `src/lib/supabase.ts` and the store has async fetch helpers (`fetchInitialData`, `fetchClubs`, `fetchEvents`, etc.). On app launch, `HomeScreen` calls `fetchInitialData` so live data is loaded.
+
+Security reminder: never commit service_role keys to the frontend. Use the backend (server) for privileged operations.
+
 ### Using Expo Go
 
 1. Install Expo Go on your mobile device
