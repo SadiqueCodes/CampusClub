@@ -1,12 +1,11 @@
--- CampusClub database schema for Supabase (Postgres)
--- Run this in the Supabase SQL editor or via migrations.
+-- CampusClub Supabase schema (run sequentially)
 
--- NOTE: This schema assumes you're using Supabase Auth (auth.users) for authentication.
--- We'll store user profile info in a `profiles` table linked to auth.users.
+-- Extensions
+create extension if not exists "uuid-ossp";
 
--- 1) Profiles
-create table if not exists profiles (
-  id uuid references auth.users on delete cascade,
+-- Profiles
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
   name text,
   email text,
   college_id text,
@@ -14,147 +13,316 @@ create table if not exists profiles (
   major text,
   year text,
   profile_photo text,
-  interests jsonb,
-  clubs_joined uuid[] default array[]::uuid[],
-  clubs_leading uuid[] default array[]::uuid[],
-  events_attended integer default 0,
+  interests text[] default '{}'::text[],
+  clubs_joined text[] default '{}'::text[],
+  clubs_leading text[] default '{}'::text[],
+  events_attended int default 0,
   rating numeric default 0,
-  total_transactions integer default 0,
-  created_at timestamptz default now(),
-  primary key (id)
+  total_transactions int default 0,
+  created_at timestamptz default now()
 );
 
--- 2) Clubs
-create table if not exists clubs (
-  id uuid default gen_random_uuid() primary key,
+alter table public.profiles enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_self_select'
+  ) then
+    create policy "profiles_self_select" on public.profiles
+      for select using (auth.uid() = id);
+  end if;
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_self_upsert'
+  ) then
+    create policy "profiles_self_upsert" on public.profiles
+      using (auth.uid() = id) with check (auth.uid() = id);
+  end if;
+end $$;
+
+-- Clubs
+create table if not exists public.clubs (
+  id uuid primary key default uuid_generate_v4(),
   name text not null,
-  type text,
+  type text not null,
   description text,
-  leader_id uuid references profiles(id),
+  leader_id uuid references public.profiles(id),
   leader_name text,
-  member_count integer default 0,
+  member_ids uuid[] default '{}'::uuid[],
+  member_count int default 0,
   created_at timestamptz default now(),
   group_chat_id uuid,
   logo text,
   logo_emoji text,
   cover_photo text,
-  upcoming_events integer default 0
+  upcoming_events int default 0
 );
 
--- 3) Club members (normalized)
-create table if not exists club_members (
-  club_id uuid references clubs(id) on delete cascade,
-  user_id uuid references profiles(id) on delete cascade,
-  role text default 'member',
-  joined_at timestamptz default now(),
-  primary key (club_id, user_id)
-);
+alter table public.clubs enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'clubs_public_read' and tablename = 'clubs'
+  ) then
+    create policy "clubs_public_read" on public.clubs for select using (true);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'clubs_leader_insert' and tablename = 'clubs'
+  ) then
+    create policy "clubs_leader_insert" on public.clubs for insert with check (auth.uid() = leader_id);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'clubs_leader_update' and tablename = 'clubs'
+  ) then
+    create policy "clubs_leader_update" on public.clubs for update using (auth.uid() = leader_id);
+  end if;
+end $$;
 
-create index if not exists idx_club_members_user on club_members(user_id);
-create index if not exists idx_club_members_club on club_members(club_id);
-
--- 4) Join requests
-create table if not exists join_requests (
-  id uuid default gen_random_uuid() primary key,
-  club_id uuid references clubs(id) on delete cascade,
-  user_id uuid references profiles(id) on delete cascade,
+-- Join requests
+create table if not exists public.join_requests (
+  id uuid primary key default uuid_generate_v4(),
+  club_id uuid references public.clubs(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete cascade,
   user_name text,
   user_photo text,
-  initiated_by text, -- 'user' | 'leader'
-  status text default 'pending', -- pending | accepted | rejected | cancelled
+  initiated_by text check (initiated_by in ('user','leader')),
+  status text default 'pending' check (status in ('pending','accepted','rejected','cancelled')),
   created_at timestamptz default now(),
   responded_at timestamptz
 );
 
-create index if not exists idx_join_requests_club on join_requests(club_id);
-create index if not exists idx_join_requests_user on join_requests(user_id);
+alter table public.join_requests enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'join_requests_visible' and tablename = 'join_requests'
+  ) then
+    create policy "join_requests_visible" on public.join_requests
+      for select using (
+        auth.uid() = user_id
+        or auth.uid() = (select leader_id from public.clubs where id = club_id)
+      );
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'join_requests_create' and tablename = 'join_requests'
+  ) then
+    create policy "join_requests_create" on public.join_requests
+      for insert with check (
+        (initiated_by = 'user' and auth.uid() = user_id)
+        or (initiated_by = 'leader' and auth.uid() = (select leader_id from public.clubs where id = club_id))
+      );
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'join_requests_update' and tablename = 'join_requests'
+  ) then
+    create policy "join_requests_update" on public.join_requests
+      for update using (
+        auth.uid() = user_id
+        or auth.uid() = (select leader_id from public.clubs where id = club_id)
+      );
+  end if;
+end $$;
 
--- 5) Events
-create table if not exists events (
-  id uuid default gen_random_uuid() primary key,
+-- Events
+create table if not exists public.events (
+  id uuid primary key default uuid_generate_v4(),
   title text not null,
   description text,
-  club_id uuid references clubs(id) on delete cascade,
+  club_id uuid references public.clubs(id) on delete cascade,
   club_name text,
   date timestamptz,
   time text,
   location text,
   banner_image text,
-  interested_user_ids uuid[] default array[]::uuid[],
-  interested_count integer default 0,
-  created_by uuid references profiles(id),
+  interested_user_ids uuid[] default '{}'::uuid[],
+  interested_count int default 0,
+  created_by uuid references public.profiles(id),
   created_at timestamptz default now()
 );
 
-create index if not exists idx_events_club on events(club_id);
-create index if not exists idx_events_date on events(date);
+alter table public.events enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'events_public_read' and tablename = 'events'
+  ) then
+    create policy "events_public_read" on public.events for select using (true);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'events_author_insert' and tablename = 'events'
+  ) then
+    create policy "events_author_insert" on public.events for insert with check (auth.uid() = created_by);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'events_author_update' and tablename = 'events'
+  ) then
+    create policy "events_author_update" on public.events for update using (auth.uid() = created_by);
+  end if;
+end $$;
 
--- 6) Marketplace
-create table if not exists marketplace_items (
-  id uuid default gen_random_uuid() primary key,
+-- Marketplace
+create table if not exists public.marketplace_items (
+  id uuid primary key default uuid_generate_v4(),
   title text not null,
   description text,
   price numeric not null,
-  images text[],
-  seller_id uuid references profiles(id),
+  images text[] default '{}'::text[],
+  seller_id uuid references public.profiles(id),
   seller_name text,
   seller_major text,
   seller_year text,
-  seller_rating numeric,
-  status text default 'active', -- active | sold | reserved
+  seller_rating numeric default 0,
+  status text default 'active' check (status in ('active','sold','reserved')),
   created_at timestamptz default now()
 );
 
-create index if not exists idx_marketplace_seller on marketplace_items(seller_id);
+alter table public.marketplace_items enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_public_read' and tablename = 'marketplace_items'
+  ) then
+    create policy "marketplace_public_read" on public.marketplace_items for select using (true);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_owner_insert' and tablename = 'marketplace_items'
+  ) then
+    create policy "marketplace_owner_insert" on public.marketplace_items for insert with check (auth.uid() = seller_id);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_owner_update' and tablename = 'marketplace_items'
+  ) then
+    create policy "marketplace_owner_update" on public.marketplace_items for update using (auth.uid() = seller_id);
+  end if;
+end $$;
 
--- 7) Chats and messages
-create table if not exists chats (
-  id uuid default gen_random_uuid() primary key,
-  type text default 'group', -- group | direct
+-- Chats
+create table if not exists public.chats (
+  id uuid primary key default uuid_generate_v4(),
+  type text default 'group',
   name text,
-  participant_ids uuid[],
+  participant_ids uuid[] default '{}'::uuid[],
   last_message jsonb,
   last_message_time timestamptz,
-  unread_count integer default 0,
-  club_id uuid references clubs(id),
-  marketplace_item_id uuid references marketplace_items(id),
+  unread_count int default 0,
+  club_id uuid references public.clubs(id) on delete cascade,
+  marketplace_item_id uuid references public.marketplace_items(id) on delete cascade,
   avatar_emoji text,
   avatar_image text,
   created_at timestamptz default now()
 );
 
-create table if not exists messages (
-  id uuid default gen_random_uuid() primary key,
-  chat_id uuid references chats(id) on delete cascade,
-  sender_id uuid references profiles(id),
+alter table public.chats enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'chats_participant_select' and tablename = 'chats'
+  ) then
+    create policy "chats_participant_select" on public.chats
+      for select using (auth.uid() = ANY(participant_ids));
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'chats_participant_insert' and tablename = 'chats'
+  ) then
+    create policy "chats_participant_insert" on public.chats
+      for insert with check (auth.uid() = ANY(participant_ids));
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'chats_participant_update' and tablename = 'chats'
+  ) then
+    create policy "chats_participant_update" on public.chats
+      for update using (auth.uid() = ANY(participant_ids));
+  end if;
+end $$;
+
+-- Messages
+create table if not exists public.messages (
+  id uuid primary key default uuid_generate_v4(),
+  chat_id uuid references public.chats(id) on delete cascade,
+  sender_id uuid references public.profiles(id),
   sender_name text,
   text text,
   timestamp timestamptz default now(),
   attachments text[]
 );
 
-create index if not exists idx_messages_chat on messages(chat_id);
+alter table public.messages enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'messages_participant_select' and tablename = 'messages'
+  ) then
+    create policy "messages_participant_select" on public.messages
+      for select using (
+        auth.uid() = ANY(
+          coalesce(
+            (select participant_ids from public.chats where id = chat_id limit 1),
+            '{}'::uuid[]
+          )
+        )
+      );
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'messages_participant_insert' and tablename = 'messages'
+  ) then
+    create policy "messages_participant_insert" on public.messages
+      for insert with check (
+        auth.uid() = ANY(
+          coalesce(
+            (select participant_ids from public.chats where id = chat_id limit 1),
+            '{}'::uuid[]
+          )
+        )
+      );
+  end if;
+end $$;
 
--- 8) Example RLS policies (you MUST adapt these)
--- Enable RLS on tables that store user data if you intend to use client-side anon keys.
+/*
+-- Storage buckets (uncomment if your Supabase project supports storage.create_bucket)
+select storage.create_bucket('marketplace');
+select storage.create_bucket('profile-photos');
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_bucket_read' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "marketplace_bucket_read"
+      on storage.objects for select using (bucket_id = 'marketplace');
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_bucket_insert' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "marketplace_bucket_insert"
+      on storage.objects for insert with check (bucket_id = 'marketplace' and auth.uid() = owner);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'marketplace_bucket_update' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "marketplace_bucket_update"
+      on storage.objects for update using (bucket_id = 'marketplace' and auth.uid() = owner);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'profile_bucket_read' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "profile_bucket_read"
+      on storage.objects for select using (bucket_id = 'profile-photos');
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'profile_bucket_insert' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "profile_bucket_insert"
+      on storage.objects for insert with check (bucket_id = 'profile-photos' and auth.uid() = owner);
+  end if;
+  if not exists (
+    select 1 from pg_policies where policyname = 'profile_bucket_update' and tablename = 'objects' and schemaname = 'storage'
+  ) then
+    create policy "profile_bucket_update"
+      on storage.objects for update using (bucket_id = 'profile-photos' and auth.uid() = owner);
+  end if;
+end $$;
+*/
 
--- Example: enable RLS for profiles (so clients can only see their own profile by default)
--- Note: Replace or extend policies as appropriate for your app.
-
--- ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "profiles_self_or_public" ON profiles
---   FOR SELECT USING (auth.uid() = id OR true); -- adjust 'true' to a condition for public access
-
--- For club_members, allow users to insert a request via watch/edge or controlled server
--- ALTER TABLE club_members ENABLE ROW LEVEL SECURITY;
-
--- Add other policies as required when using anon client keys.
-
--- 9) Helpful views or functions (optional)
--- Example: view for club with leader data
-create or replace view club_with_leader as
+-- Helper view
+create or replace view public.club_with_leader as
 select c.*, p.name as leader_name_from_profiles
-from clubs c
-left join profiles p on p.id = c.leader_id;
-
--- End of schema
+from public.clubs c
+left join public.profiles p on p.id = c.leader_id;

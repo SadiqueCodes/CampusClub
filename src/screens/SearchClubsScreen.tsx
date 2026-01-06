@@ -6,7 +6,10 @@ import { useStore } from '../store';
 import { Club } from '../types';
 
 export const SearchClubsScreen: React.FC = () => {
-  const { clubs, currentUser, addJoinRequest, joinRequests } = useStore();
+  const clubs = useStore((state) => state.clubs);
+  const currentUser = useStore((state) => state.currentUser);
+  const joinRequests = useStore((state) => state.joinRequests);
+  const createJoinRequest = useStore((state) => state.createJoinRequest);
   const [query, setQuery] = useState('');
 
   const myId = currentUser?.id || '';
@@ -36,7 +39,7 @@ export const SearchClubsScreen: React.FC = () => {
     [joinRequests, myId]
   );
 
-  const handleRequestJoin = (club: Club) => {
+  const handleRequestJoin = async (club: Club) => {
     if (!currentUser) return;
     if (requestedClubIds.includes(club.id)) return;
     if (club.memberIds.includes(myId)) {
@@ -44,7 +47,7 @@ export const SearchClubsScreen: React.FC = () => {
       return;
     }
 
-    addJoinRequest({
+    await createJoinRequest({
       id: `request_${Date.now()}`,
       clubId: club.id,
       userId: currentUser.id,

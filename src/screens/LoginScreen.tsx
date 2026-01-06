@@ -40,7 +40,6 @@ export const LoginScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [useMagicLink, setUseMagicLink] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signUpStep, setSignUpStep] = useState(1);
@@ -87,7 +86,6 @@ export const LoginScreen: React.FC = () => {
 
   const signIn = useStore((state) => state.signIn);
   const signUp = useStore((state) => state.signUp);
-  const signInWithMagicLink = useStore((state) => (state as any).signInWithMagicLink);
   const stepDetails = [
     { title: 'Basic info', subtitle: 'Tell us how to reach you' },
     { title: 'Campus details', subtitle: 'Share your program info' },
@@ -152,15 +150,10 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email) return;
-    if (!useMagicLink && !password) return;
+    if (!password) return;
     setLoading(true);
     try {
-      if (useMagicLink) {
-        await signInWithMagicLink(email);
-        Alert.alert('Magic link sent', 'Check your email for a sign-in link.');
-      } else {
-        await signIn({ email, password });
-      }
+      await signIn({ email, password });
     } catch (error) {
       console.error('Login error:', error);
     } finally {
@@ -260,15 +253,6 @@ export const LoginScreen: React.FC = () => {
           />
         </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-        <TouchableOpacity onPress={() => setUseMagicLink((v) => !v)} style={{ marginRight: 8 }}>
-          <View style={[styles.checkbox, useMagicLink && styles.checkboxChecked]}>
-            {useMagicLink && <Ionicons name="checkmark" size={14} color="#E372A1" />}
-          </View>
-        </TouchableOpacity>
-        <Text style={{ color: '#636E72' }}>Use magic link (passwordless)</Text>
-      </View>
-
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Password</Text>
         <View style={styles.inputWrapper}>

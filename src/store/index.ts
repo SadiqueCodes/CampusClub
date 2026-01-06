@@ -2,9 +2,54 @@ import { create } from 'zustand';
 import { User, Club, Event, MarketplaceItem, Chat, Message, JoinRequest } from '../types';
 import supabase from '../lib/supabase';
 import secureStore from '../lib/secureStore';
+import { notifyJoinRequest, notifiedJoinRequestIds } from '../utils/notifications';
+import { uploadImageToSupabase } from '../lib/storage';
 
 // Runtime map of active realtime subscriptions by chatId
 const _realtimeSubscriptions = new Map<string, any>();
+let marketplaceChannel: any = null;
+
+const normalizeEventRow = (row: any): Event => ({
+  id: row.id?.toString() || row.id || '',
+  title: row.title || '',
+  description: row.description || '',
+  clubId: row.club_id || row.clubId || '',
+  clubName: row.club_name || row.clubName || '',
+  date: row.date ? new Date(row.date) : new Date(),
+  time: row.time || '',
+  location: row.location || '',
+  bannerImage: row.banner_image || row.bannerImage || undefined,
+  interestedUserIds: row.interested_user_ids || row.interestedUserIds || [],
+  interestedCount: row.interested_count ?? row.interestedCount ?? 0,
+  createdBy: row.created_by || row.createdBy || '',
+});
+
+const normalizeJoinRequestRow = (row: any): JoinRequest => ({
+  id: row.id?.toString() || row.id || '',
+  clubId: row.club_id || row.clubId || '',
+  userId: row.user_id || row.userId || '',
+  userName: row.user_name || row.userName || '',
+  userPhoto: row.user_photo || row.userPhoto || undefined,
+  initiatedBy: row.initiated_by || row.initiatedBy || 'user',
+  status: row.status || 'pending',
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+  respondedAt: row.responded_at ? new Date(row.responded_at) : row.respondedAt ? new Date(row.respondedAt) : undefined,
+});
+
+const normalizeMarketplaceRow = (row: any): MarketplaceItem => ({
+  id: row.id?.toString() || row.id || '',
+  title: row.title || '',
+  description: row.description || '',
+  price: Number(row.price) || 0,
+  images: row.images || [],
+  sellerId: row.seller_id || row.sellerId || '',
+  sellerName: row.seller_name || row.sellerName || '',
+  sellerMajor: row.seller_major || row.sellerMajor || '',
+  sellerYear: row.seller_year || row.sellerYear || '',
+  sellerRating: row.seller_rating ?? row.sellerRating ?? 0,
+  status: row.status || 'active',
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+});
 
 interface AppState {
   // Auth
@@ -26,11 +71,22 @@ interface AppState {
   setClubs: (clubs: Club[]) => void;
   addClub: (club: Club) => void;
   updateClub: (clubId: string, updates: Partial<Club>) => void;
+  addMemberToClub: (clubId: string, userId: string) => Promise<void>;
 
   // Events
   events: Event[];
   setEvents: (events: Event[]) => void;
   addEvent: (event: Event) => void;
+  createEvent: (payload: {
+    title: string;
+    description: string;
+    clubId: string;
+    clubName: string;
+    date: Date;
+    time: string;
+    location: string;
+    bannerImage?: string | null;
+  }) => Promise<Event>;
   updateEvent: (eventId: string, updates: Partial<Event>) => void;
   toggleEventInterest: (eventId: string, userId: string) => void;
 
@@ -40,6 +96,14 @@ interface AppState {
   setMarketplaceItems: (items: MarketplaceItem[]) => void;
   addMarketplaceItem: (item: MarketplaceItem) => void;
   updateMarketplaceItem: (itemId: string, updates: Partial<MarketplaceItem>) => void;
+  createMarketplaceItem: (item: {
+    title: string;
+    description: string;
+    price: number;
+    imageUris?: string[];
+  }) => Promise<MarketplaceItem>;
+  subscribeToMarketplace: () => void;
+  unsubscribeFromMarketplace: () => void;
 
   // Chats
   chats: Chat[];
@@ -70,11 +134,33 @@ interface AppState {
   // Join Requests
   joinRequests: JoinRequest[];
   setJoinRequests: (requests: JoinRequest[]) => void;
-  addJoinRequest: (request: JoinRequest) => void;
-  updateJoinRequest: (requestId: string, updates: Partial<JoinRequest>) => void;
+  createJoinRequest: (request: Omit<JoinRequest, 'id' | 'respondedAt'> & { id?: string }) => Promise<JoinRequest>;
+  updateJoinRequest: (requestId: string, updates: Partial<JoinRequest>) => Promise<void>;
 }
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>((set, get) => {
+  const maybeNotifyJoinRequests = (requestsInput: JoinRequest | JoinRequest[]) => {
+    const requests = Array.isArray(requestsInput) ? requestsInput : [requestsInput];
+    const userId = get().currentUser?.id;
+    if (!userId) return;
+    const clubs = get().clubs;
+    const leaderClubIds = new Set(clubs.filter((club) => club.leaderId === userId).map((club) => club.id));
+
+    requests.forEach((request) => {
+      if (request.status !== 'pending' || notifiedJoinRequestIds.has(request.id)) return;
+      const club = clubs.find((c) => c.id === request.clubId);
+      const clubName = club?.name || 'your club';
+      const leaderShouldNotify = request.initiatedBy === 'user' && leaderClubIds.has(request.clubId);
+      const userShouldNotify = request.initiatedBy === 'leader' && request.userId === userId;
+      if (leaderShouldNotify) {
+        notifyJoinRequest('New club application', `${request.userName} applied to ${clubName}`, request.id);
+      } else if (userShouldNotify) {
+        notifyJoinRequest('Club invitation', `${clubName} invited you to join`, request.id);
+      }
+    });
+  };
+
+  return {
   // Auth state
   currentUser: null,
   isAuthenticated: false,
@@ -277,6 +363,11 @@ export const useStore = create<AppState>((set, get) => ({
         } catch (e) {
           console.warn('unsubscribeAllRealtime on logout failed', e);
         }
+        try {
+          (get() as any).unsubscribeFromMarketplace();
+        } catch (e) {
+          console.warn('unsubscribeFromMarketplace on logout failed', e);
+        }
         await supabase.auth.signOut();
       } catch (e) {
         console.warn('signOut error', e);
@@ -317,6 +408,28 @@ export const useStore = create<AppState>((set, get) => ({
       clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, ...updates } : c)),
     })),
 
+  addMemberToClub: async (clubId, userId) => {
+    const state = get();
+    const club = state.clubs.find((c) => c.id === clubId);
+    if (!club) return;
+    if (club.memberIds.includes(userId)) return;
+
+    const updatedMembers = [...club.memberIds, userId];
+    const updatedClub = { ...club, memberIds: updatedMembers, memberCount: updatedMembers.length };
+    set((s) => ({
+      clubs: s.clubs.map((c) => (c.id === clubId ? updatedClub : c)),
+    }));
+
+    try {
+      await supabase
+        .from('clubs')
+        .update({ member_ids: updatedMembers, member_count: updatedMembers.length })
+        .eq('id', clubId);
+    } catch (err) {
+      console.error('addMemberToClub supabase update failed', err);
+    }
+  },
+
   // Events state
   events: [],
 
@@ -324,11 +437,63 @@ export const useStore = create<AppState>((set, get) => ({
 
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
 
+  createEvent: async (payload) => {
+    const currentUser = get().currentUser;
+    if (!currentUser) {
+      throw new Error('Not authenticated');
+    }
+    const eventToInsert = {
+      title: payload.title,
+      description: payload.description,
+      club_id: payload.clubId,
+      club_name: payload.clubName,
+      date: payload.date.toISOString(),
+      time: payload.time,
+      location: payload.location,
+      banner_image: payload.bannerImage || null,
+      interested_user_ids: [],
+      interested_count: 0,
+      created_by: currentUser.id,
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .insert(eventToInsert)
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      const normalized = normalizeEventRow(data);
+      set((state) => ({ events: [...state.events, normalized] }));
+      return normalized;
+    } catch (err) {
+      console.error('createEvent error', err);
+      const fallback: Event = {
+        id: `local_event_${Date.now()}`,
+        title: payload.title,
+        description: payload.description,
+        clubId: payload.clubId,
+        clubName: payload.clubName,
+        date: payload.date,
+        time: payload.time,
+        location: payload.location,
+        bannerImage: payload.bannerImage || undefined,
+        interestedUserIds: [],
+        interestedCount: 0,
+        createdBy: currentUser.id,
+      };
+      get().addEvent(fallback);
+      return fallback;
+    }
+  },
+
   fetchEvents: async () => {
     try {
       const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
       if (error) throw error;
-      set({ events: (data as Event[]) || [] });
+      const normalized = (data || []).map(normalizeEventRow);
+      set({ events: normalized });
     } catch (err) {
       console.error('fetchEvents error', err);
     }
@@ -343,13 +508,14 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({
       events: state.events.map((e) => {
         if (e.id === eventId) {
-          const isInterested = e.interestedUserIds.includes(userId);
+          const interestedList = e.interestedUserIds || [];
+          const isInterested = interestedList.includes(userId);
           return {
             ...e,
             interestedUserIds: isInterested
-              ? e.interestedUserIds.filter((id) => id !== userId)
-              : [...e.interestedUserIds, userId],
-            interestedCount: isInterested ? e.interestedCount - 1 : e.interestedCount + 1,
+              ? interestedList.filter((id) => id !== userId)
+              : [...interestedList, userId],
+            interestedCount: Math.max(0, isInterested ? (e.interestedCount || 0) - 1 : (e.interestedCount || 0) + 1),
           };
         }
         return e;
@@ -366,7 +532,13 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data, error } = await supabase.from('marketplace_items').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      set({ marketplaceItems: (data as MarketplaceItem[]) || [] });
+      const normalized = (data || []).map(normalizeMarketplaceRow);
+      const currentUserId = get().currentUser?.id;
+      set({
+        marketplaceItems: normalized,
+        myListings: currentUserId ? normalized.filter((item) => item.sellerId === currentUserId) : [],
+      });
+      get().subscribeToMarketplace();
     } catch (err) {
       console.error('fetchMarketplace error', err);
     }
@@ -385,6 +557,156 @@ export const useStore = create<AppState>((set, get) => ({
       ),
       myListings: state.myListings.map((i) => (i.id === itemId ? { ...i, ...updates } : i)),
     })),
+
+  createMarketplaceItem: async ({ title, description, price, imageUris = [] }: { title: string; description: string; price: number; imageUris?: string[] }) => {
+    const currentUser = get().currentUser;
+    if (!currentUser) {
+      throw new Error('Not authenticated');
+    }
+    let uploadedImageUrls: string[] = [];
+    if (imageUris.length > 0) {
+      try {
+        uploadedImageUrls = await Promise.all(
+          imageUris.map((uri) => uploadImageToSupabase(uri, `marketplace/${currentUser.id}`))
+        );
+      } catch (error) {
+        console.warn('Image upload failed; continuing without images', error);
+      }
+    }
+
+    const imageSources = uploadedImageUrls.length > 0 ? uploadedImageUrls : imageUris;
+
+    const payload = {
+      title,
+      description,
+      price,
+      images: imageSources,
+      seller_id: currentUser.id,
+      seller_name: currentUser.name,
+      seller_major: currentUser.major,
+      seller_year: currentUser.year,
+      seller_rating: currentUser.rating || 0,
+      status: 'active',
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .insert(payload)
+        .select('*')
+        .single();
+      if (error) throw error;
+      const normalized = normalizeMarketplaceRow(data);
+      set((state) => ({
+        marketplaceItems: [normalized, ...state.marketplaceItems],
+        myListings: normalized.sellerId === currentUser.id ? [normalized, ...state.myListings] : state.myListings,
+      }));
+      return normalized;
+    } catch (err) {
+      console.error('createMarketplaceItem error', err);
+      const fallback: MarketplaceItem = {
+        id: `local_market_${Date.now()}`,
+        title,
+        description,
+        price,
+        images: imageSources,
+        sellerId: currentUser.id,
+        sellerName: currentUser.name,
+        sellerMajor: currentUser.major,
+        sellerYear: currentUser.year,
+        sellerRating: currentUser.rating || 0,
+        status: 'active',
+        createdAt: new Date(),
+      };
+      set((state) => ({
+        marketplaceItems: [fallback, ...state.marketplaceItems],
+        myListings: [fallback, ...state.myListings],
+      }));
+      return fallback;
+    }
+  },
+
+  subscribeToMarketplace: () => {
+    try {
+      if (marketplaceChannel) return;
+      marketplaceChannel = supabase
+        .channel('public:marketplace_items')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'marketplace_items' },
+          (payload: any) => {
+            const normalized = normalizeMarketplaceRow(payload.new);
+            set((state) => {
+              const upsert = (list: MarketplaceItem[]) => {
+                const idx = list.findIndex((item) => item.id === normalized.id);
+                if (idx >= 0) {
+                  const next = [...list];
+                  next[idx] = normalized;
+                  return next;
+                }
+                return [...list, normalized];
+              };
+              const updatedListings =
+                normalized.sellerId === state.currentUser?.id
+                  ? upsert(state.myListings)
+                  : state.myListings.filter((item) => item.id !== normalized.id);
+              return {
+                marketplaceItems: upsert(state.marketplaceItems),
+                myListings: updatedListings,
+              };
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'marketplace_items' },
+          (payload: any) => {
+            const normalized = normalizeMarketplaceRow(payload.new);
+            set((state) => ({
+              marketplaceItems: state.marketplaceItems.map((item) =>
+                item.id === normalized.id ? normalized : item
+              ),
+              myListings:
+                normalized.sellerId === state.currentUser?.id
+                  ? state.myListings.map((item) => (item.id === normalized.id ? normalized : item))
+                  : state.myListings.filter((item) => item.id !== normalized.id),
+            }));
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'marketplace_items' },
+          (payload: any) => {
+            const id = payload.old?.id?.toString() || payload.old?.id;
+            if (!id) return;
+            set((state) => ({
+              marketplaceItems: state.marketplaceItems.filter((item) => item.id !== id),
+              myListings: state.myListings.filter((item) => item.id !== id),
+            }));
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.error('subscribeToMarketplace error', err);
+    }
+  },
+
+  unsubscribeFromMarketplace: () => {
+    try {
+      if (marketplaceChannel) {
+        marketplaceChannel.unsubscribe?.();
+        // @ts-ignore
+        if (supabase.removeChannel) {
+          // @ts-ignore
+          supabase.removeChannel(marketplaceChannel);
+        }
+      }
+    } catch (err) {
+      console.warn('unsubscribeFromMarketplace error', err);
+    } finally {
+      marketplaceChannel = null;
+    }
+  },
 
   // Chats state
   chats: [],
@@ -656,9 +978,31 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const userId = get().currentUser?.id;
       if (!userId) return;
-      const { data, error } = await supabase.from('join_requests').select('*').or(`user_id.eq.${userId}`);
-      if (error) throw error;
-      set({ joinRequests: (data as JoinRequest[]) || [] });
+
+      const merged = new Map<string, any>();
+
+      const { data: myRequests, error: myError } = await supabase
+        .from('join_requests')
+        .select('*')
+        .eq('user_id', userId);
+      if (myError) throw myError;
+      (myRequests || []).forEach((row) => merged.set((row as any).id, row));
+
+      const leaderClubIds = get()
+        .clubs.filter((club) => club.leaderId === userId)
+        .map((club) => club.id);
+      if (leaderClubIds.length > 0) {
+        const { data: leaderRequests, error: leaderError } = await supabase
+          .from('join_requests')
+          .select('*')
+          .in('club_id', leaderClubIds);
+        if (leaderError) throw leaderError;
+        (leaderRequests || []).forEach((row) => merged.set((row as any).id, row));
+      }
+
+      const normalized = Array.from(merged.values()).map(normalizeJoinRequestRow);
+      set({ joinRequests: normalized });
+      maybeNotifyJoinRequests(normalized);
     } catch (err) {
       console.error('fetchJoinRequests error', err);
     }
@@ -675,13 +1019,88 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  addJoinRequest: (request) =>
-    set((state) => ({ joinRequests: [...state.joinRequests, request] })),
+  createJoinRequest: async (request) => {
+    const payload = {
+      club_id: request.clubId,
+      user_id: request.userId,
+      user_name: request.userName,
+      user_photo: request.userPhoto || null,
+      initiated_by: request.initiatedBy,
+      status: request.status,
+      created_at: (request.createdAt || new Date()).toISOString(),
+    };
 
-  updateJoinRequest: (requestId, updates) =>
-    set((state) => ({
-      joinRequests: state.joinRequests.map((r) =>
-        r.id === requestId ? { ...r, ...updates } : r
-      ),
-    })),
-}));
+    try {
+      const { data, error } = await supabase
+        .from('join_requests')
+        .insert(payload)
+        .select('*')
+        .single();
+      if (error) throw error;
+      const normalized = normalizeJoinRequestRow(data);
+      set((state) => ({ joinRequests: [...state.joinRequests, normalized] }));
+      maybeNotifyJoinRequests(normalized);
+      return normalized;
+    } catch (err) {
+      console.error('createJoinRequest error', err);
+      const fallback: JoinRequest = {
+        ...request,
+        id: request.id || `local_join_${Date.now()}`,
+        createdAt: request.createdAt || new Date(),
+      };
+      set((state) => ({ joinRequests: [...state.joinRequests, fallback] }));
+      maybeNotifyJoinRequests(fallback);
+      return fallback;
+    }
+  },
+
+  updateJoinRequest: async (requestId, updates) => {
+    const dbUpdates: Record<string, any> = {};
+    if (typeof updates.status !== 'undefined') {
+      dbUpdates.status = updates.status;
+    }
+    if (updates.respondedAt) {
+      dbUpdates.responded_at = updates.respondedAt.toISOString();
+    }
+    if (updates.initiatedBy) {
+      dbUpdates.initiated_by = updates.initiatedBy;
+    }
+    if (typeof updates.userName !== 'undefined') {
+      dbUpdates.user_name = updates.userName;
+    }
+    if (typeof updates.userPhoto !== 'undefined') {
+      dbUpdates.user_photo = updates.userPhoto;
+    }
+
+    try {
+      if (Object.keys(dbUpdates).length > 0) {
+        const { data, error } = await supabase
+          .from('join_requests')
+          .update(dbUpdates)
+          .eq('id', requestId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        const normalized = normalizeJoinRequestRow(data);
+        set((state) => ({
+          joinRequests: state.joinRequests.map((r) => (r.id === requestId ? normalized : r)),
+        }));
+        return;
+      }
+      // nothing to persist, but ensure state is updated
+      set((state) => ({
+        joinRequests: state.joinRequests.map((r) =>
+          r.id === requestId ? { ...r, ...updates } : r
+        ),
+      }));
+    } catch (err) {
+      console.error('updateJoinRequest error', err);
+      set((state) => ({
+        joinRequests: state.joinRequests.map((r) =>
+          r.id === requestId ? { ...r, ...updates } : r
+        ),
+      }));
+    }
+  },
+  };
+});

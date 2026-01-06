@@ -1,8 +1,21 @@
 import supabase from './supabase';
 import Constants from 'expo-constants';
 
-const extras: Record<string, any> = (Constants.expoConfig && (Constants.expoConfig.extra as Record<string, any>)) || (Constants.manifest && (Constants.manifest.extra as Record<string, any>)) || {};
-const BACKEND_URL = extras.BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080';
+const extras: Record<string, any> =
+  (Constants.expoConfig && (Constants.expoConfig.extra as Record<string, any>)) ||
+  (Constants.manifest && (Constants.manifest.extra as Record<string, any>)) ||
+  {};
+
+const trimIfString = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const resolvedBackendUrl =
+  trimIfString(extras.BACKEND_URL) ||
+  trimIfString(process.env.BACKEND_URL) ||
+  trimIfString((process.env as any).EXPO_PUBLIC_BACKEND_URL);
+
+const BACKEND_URL = resolvedBackendUrl;
+export const isBackendConfigured = () => BACKEND_URL.length > 0;
 
 export async function postMessage(chatId: string, text: string) {
   const sessionRes = await supabase.auth.getSession();
@@ -36,7 +49,7 @@ export async function postMessage(chatId: string, text: string) {
 
 // Wrapper that will use backend if configured, otherwise fall back to direct insert
 export async function postMessageSmart(chatId: string, text: string) {
-  if (BACKEND_URL && BACKEND_URL !== '') {
+  if (isBackendConfigured()) {
     return postMessage(chatId, text);
   }
   return postMessageDirect(chatId, text);
@@ -51,6 +64,9 @@ export async function postMessageDirect(chatId: string, text: string) {
 }
 
 export async function createClub(payload: { name: string; type: string; description?: string }) {
+  if (!BACKEND_URL) {
+    throw new Error('Backend URL not configured.');
+  }
   const sessionRes = await supabase.auth.getSession();
   const token = (sessionRes as any)?.data?.session?.access_token;
 
@@ -71,6 +87,9 @@ export async function createClub(payload: { name: string; type: string; descript
 }
 
 export async function createChat(payload: { participant_ids: string[]; name?: string; club_id?: string }) {
+  if (!BACKEND_URL) {
+    throw new Error('Backend URL not configured.');
+  }
   const sessionRes = await supabase.auth.getSession();
   const token = (sessionRes as any)?.data?.session?.access_token;
 
@@ -91,6 +110,9 @@ export async function createChat(payload: { participant_ids: string[]; name?: st
 }
 
 export async function updateClub(clubId: string, updates: Record<string, any>) {
+  if (!BACKEND_URL) {
+    throw new Error('Backend URL not configured.');
+  }
   const sessionRes = await supabase.auth.getSession();
   const token = (sessionRes as any)?.data?.session?.access_token;
 

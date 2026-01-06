@@ -8,8 +8,13 @@ import { JoinRequest } from '../types';
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { joinRequests, clubs, currentUser, updateJoinRequest, updateClub, chats, updateChat } =
-    useStore();
+  const joinRequests = useStore((state) => state.joinRequests);
+  const clubs = useStore((state) => state.clubs);
+  const currentUser = useStore((state) => state.currentUser);
+  const updateJoinRequest = useStore((state) => state.updateJoinRequest);
+  const chats = useStore((state) => state.chats);
+  const updateChat = useStore((state) => state.updateChat);
+  const addMemberToClub = useStore((state) => state.addMemberToClub);
   const myId = currentUser?.id || '';
 
   const myApplications = useMemo(
@@ -58,15 +63,12 @@ export const NotificationsScreen: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const addUserToClub = (clubId: string, userId: string) => {
+  const addUserToClub = async (clubId: string, userId: string) => {
     const club = clubs.find((c) => c.id === clubId);
     if (!club) return;
 
     if (!club.memberIds.includes(userId)) {
-      updateClub(club.id, {
-        memberIds: [...club.memberIds, userId],
-        memberCount: club.memberIds.length + 1,
-      });
+      await addMemberToClub(club.id, userId);
     }
 
     const clubChat = chats.find((chat) => chat.clubId === clubId);
@@ -75,26 +77,29 @@ export const NotificationsScreen: React.FC = () => {
     }
   };
 
-  const handleApplicationDecision = (request: JoinRequest, decision: 'accepted' | 'rejected') => {
+  const handleApplicationDecision = async (request: JoinRequest, decision: 'accepted' | 'rejected') => {
     if (decision === 'accepted') {
-      addUserToClub(request.clubId, request.userId);
+      await addUserToClub(request.clubId, request.userId);
     }
-    updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
+    await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
   };
 
-  const handleInvitationDecision = (request: JoinRequest, decision: 'accepted' | 'rejected') => {
+  const handleInvitationDecision = async (
+    request: JoinRequest,
+    decision: 'accepted' | 'rejected'
+  ) => {
     if (decision === 'accepted' && request.userId === myId) {
-      addUserToClub(request.clubId, request.userId);
+      await addUserToClub(request.clubId, request.userId);
     }
-    updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
+    await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
   };
 
-  const handleCancelRequest = (request: JoinRequest) => {
-    updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+  const handleCancelRequest = async (request: JoinRequest) => {
+    await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
   };
 
-  const handleCancelInvite = (request: JoinRequest) => {
-    updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+  const handleCancelInvite = async (request: JoinRequest) => {
+    await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
   };
 
   const renderStatusBadge = (request: JoinRequest) => {

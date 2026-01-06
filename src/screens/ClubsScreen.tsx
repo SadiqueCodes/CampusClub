@@ -17,7 +17,11 @@ import { Club, JoinRequest } from '../types';
 
 export const ClubsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { clubs, myClubs, currentUser, addJoinRequest, joinRequests } = useStore();
+  const clubs = useStore((state) => state.clubs);
+  const myClubs = useStore((state) => state.myClubs);
+  const currentUser = useStore((state) => state.currentUser);
+  const joinRequests = useStore((state) => state.joinRequests);
+  const createJoinRequest = useStore((state) => state.createJoinRequest);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredClubs, setFilteredClubs] = useState<Club[]>([]);
 
@@ -49,7 +53,7 @@ export const ClubsScreen: React.FC = () => {
     );
   }, [joinRequests, currentUser?.id]);
 
-  const handleJoinClub = (club: Club) => {
+  const handleJoinClub = async (club: Club) => {
     if (!currentUser) return;
 
     const joinRequest: JoinRequest = {
@@ -63,7 +67,7 @@ export const ClubsScreen: React.FC = () => {
       createdAt: new Date(),
     };
 
-    addJoinRequest(joinRequest);
+    await createJoinRequest(joinRequest);
 
     Alert.alert(
       'Request Sent!',

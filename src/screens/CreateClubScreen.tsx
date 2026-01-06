@@ -8,7 +8,7 @@ import { SwipeCard } from '../components/SwipeCard';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import supabase from '../lib/supabase';
-import api from '../lib/api';
+import api, { isBackendConfigured } from '../lib/api';
 import { Club, ClubType, User } from '../types';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -33,7 +33,7 @@ export const CreateClubScreen: React.FC = () => {
   const chats = useStore((state) => state.chats);
   const clubs = useStore((state) => state.clubs);
   const joinRequests = useStore((state) => state.joinRequests);
-  const addJoinRequest = useStore((state) => state.addJoinRequest);
+  const createJoinRequest = useStore((state) => state.createJoinRequest);
 
   const myClubs = useMemo(() => {
     if (!currentUser?.id) return [];
@@ -151,7 +151,7 @@ export const CreateClubScreen: React.FC = () => {
       setInviteFeedback(`${member.name} already invited`);
       return;
     }
-    addJoinRequest({
+    createJoinRequest({
       id: `invite_${Date.now()}`,
       clubId: activeClub.id,
       userId: member.id,
@@ -172,30 +172,100 @@ export const CreateClubScreen: React.FC = () => {
     navigation.navigate('ClubChatDetail', { chatId: clubChat.id });
   };
 
+  const createLocalClub = async () => {
+    if (!currentUser) return;
+    const newClub: Club = {
+      id: Date.now().toString(),
+      name: clubName,
+      type: clubType,
+      description: clubDescription,
+      leaderId: currentUser.id,
+      leaderName: currentUser.name,
+      memberIds: [currentUser.id],
+      memberCount: 1,
+      createdAt: new Date(),
+      groupChatId: '',
+      logoEmoji: '👥',
+      upcomingEvents: 0,
+    };
+
+    try {
+      const { data: chatRow, error } = await supabase
+        .from('chats')
+        .insert({
+          type: 'group',
+          name: newClub.name,
+          participant_ids: [currentUser.id],
+          club_id: null,
+        })
+        .select('*')
+        .single();
+
+      if (!error && chatRow) {
+        newClub.groupChatId = chatRow.id;
+      } else {
+        newClub.groupChatId = `chat_${Date.now()}`;
+      }
+    } catch (err) {
+      console.warn('Local chat creation fallback failed, using temp id', err);
+      newClub.groupChatId = `chat_${Date.now()}`;
+    }
+
+    addClub(newClub);
+    addChat({
+      id: newClub.groupChatId,
+      type: 'group',
+      name: newClub.name,
+      participantIds: [currentUser.id],
+      avatarEmoji: '👥',
+      lastMessage: {
+        id: '1',
+        chatId: newClub.groupChatId,
+        senderId: 'system',
+        senderName: 'System',
+        text: `${newClub.name} group created!`,
+        timestamp: new Date(),
+      },
+      lastMessageTime: new Date(),
+      unreadCount: 0,
+      clubId: newClub.id,
+    });
+
+    setActiveClubId(newClub.id);
+    setShowCreateModal(false);
+    setIsSwipeMode(true);
+    setCurrentProfileIndex(0);
+    resetForm();
+  };
+
   const handleCreateClub = () => {
     if (!clubName || !clubDescription || !currentUser) return;
 
+    if (!isBackendConfigured()) {
+      createLocalClub();
+      return;
+    }
+
     (async () => {
       try {
-        // Create club on the backend
         const payload = { name: clubName, type: clubType, description: clubDescription };
         const created = await api.createClub(payload);
         const createdClub = (created as any).data || created;
 
-        // Create a group chat for the club on the backend
-        const chatPayload = { participant_ids: [currentUser.id], name: clubName, club_id: createdClub.id };
+        const chatPayload = {
+          participant_ids: [currentUser.id],
+          name: clubName,
+          club_id: createdClub.id,
+        };
         const chatRes = await api.createChat(chatPayload);
         const createdChat = (chatRes as any).data || chatRes;
 
-        // Update club to set group_chat_id
         try {
           await api.updateClub(createdClub.id, { group_chat_id: createdChat.id });
         } catch (e) {
-          // Non-fatal: continue even if updating club group_chat_id fails
           console.warn('Failed to update club with group_chat_id', e);
         }
 
-        // Push to local store
         const clubToStore: Club = {
           id: createdClub.id,
           name: createdClub.name,
@@ -226,7 +296,9 @@ export const CreateClubScreen: React.FC = () => {
                 senderId: createdChat.last_message.sender_id,
                 senderName: createdChat.last_message.sender_name,
                 text: createdChat.last_message.text,
-                timestamp: createdChat.last_message.timestamp ? new Date(createdChat.last_message.timestamp) : new Date(),
+                timestamp: createdChat.last_message.timestamp
+                  ? new Date(createdChat.last_message.timestamp)
+                  : new Date(),
               }
             : {
                 id: '1',
@@ -250,48 +322,7 @@ export const CreateClubScreen: React.FC = () => {
         resetForm();
       } catch (e) {
         console.warn('Create club backend flow failed, falling back to local creation', e);
-        // Fallback to local-only behavior
-        const newClub: Club = {
-          id: Date.now().toString(),
-          name: clubName,
-          type: clubType,
-          description: clubDescription,
-          leaderId: currentUser.id,
-          leaderName: currentUser.name,
-          memberIds: [currentUser.id],
-          memberCount: 1,
-          createdAt: new Date(),
-          groupChatId: `chat_${Date.now()}`,
-          logoEmoji: '👥',
-          upcomingEvents: 0,
-        };
-
-        addClub(newClub);
-        // Create local chat
-        addChat({
-          id: newClub.groupChatId,
-          type: 'group',
-          name: newClub.name,
-          participantIds: [currentUser.id],
-          avatarEmoji: '👥',
-          lastMessage: {
-            id: '1',
-            chatId: newClub.groupChatId,
-            senderId: 'system',
-            senderName: 'System',
-            text: `${newClub.name} group created!`,
-            timestamp: new Date(),
-          },
-          lastMessageTime: new Date(),
-          unreadCount: 0,
-          clubId: newClub.id,
-        });
-
-        setActiveClubId(newClub.id);
-        setShowCreateModal(false);
-        setIsSwipeMode(true);
-        setCurrentProfileIndex(0);
-        resetForm();
+        createLocalClub();
       }
     })();
   };

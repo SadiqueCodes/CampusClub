@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions, Modal, TextInput, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Line, Defs, Pattern, Rect } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 import { Lobster_400Regular } from '@expo-google-fonts/lobster';
+import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../store';
 import { Club, Event, MarketplaceItem } from '../types';
 
@@ -14,6 +15,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { clubs, events, marketplaceItems, currentUser, joinRequests } = useStore();
+  const createMarketplaceItem = useStore((state) => state.createMarketplaceItem);
+  const [showListingModal, setShowListingModal] = useState(false);
+  const [listingTitle, setListingTitle] = useState('');
+  const [listingDescription, setListingDescription] = useState('');
+  const [listingPrice, setListingPrice] = useState('');
+  const [isListingSaving, setIsListingSaving] = useState(false);
+  const [listingImage, setListingImage] = useState<string | null>(null);
   const fetchInitialData = useStore((s) => s.fetchInitialData);
   const [fontsLoaded] = useFonts({
     Lobster_400Regular,
@@ -242,6 +250,56 @@ export const HomeScreen: React.FC = () => {
 
   const isClubLeader = currentUser && clubs.some(c => c.leaderId === currentUser.id);
 
+  const handleCreateListing = async () => {
+    if (!currentUser) {
+      Alert.alert('Sign in required', 'Please sign in to list an item.');
+      return;
+    }
+    if (!listingTitle.trim()) {
+      Alert.alert('Missing info', 'Please enter a title for your listing.');
+      return;
+    }
+    const parsedPrice = Number(listingPrice);
+    if (Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      Alert.alert('Invalid price', 'Enter a valid positive price.');
+      return;
+    }
+    setIsListingSaving(true);
+    try {
+      await createMarketplaceItem({
+        title: listingTitle.trim(),
+        description: listingDescription.trim() || 'No description provided',
+        price: parsedPrice,
+        imageUris: listingImage ? [listingImage] : [],
+      });
+      closeListingModal();
+    } catch (err) {
+      console.error('create listing error', err);
+      Alert.alert('Could not create listing', 'Please try again.');
+    } finally {
+      setIsListingSaving(false);
+    }
+  };
+
+  const closeListingModal = () => {
+    setShowListingModal(false);
+    setListingTitle('');
+    setListingDescription('');
+    setListingPrice('');
+    setListingImage(null);
+  };
+
+  const handlePickListingImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      setListingImage(result.assets[0].uri);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
@@ -348,13 +406,17 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Marketplace</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Marketplace')}>
               <Text style={styles.seeMoreText}>See More</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.marketplaceGrid}>
             {marketplaceItems.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.marketplaceItem}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.marketplaceItem}
+                onPress={() => navigation.navigate('MarketplaceDetail', { itemId: item.id })}
+              >
                 {item.images && item.images.length > 0 ? (
                   <Image source={{ uri: item.images[0] }} style={styles.itemImage} />
                 ) : (
@@ -376,7 +438,7 @@ export const HomeScreen: React.FC = () => {
                   <Text style={styles.itemTitle} numberOfLines={1}>
                     {item.title}
                   </Text>
-                  <Text style={styles.itemPrice}>${item.price}</Text>
+                <Text style={styles.itemPrice}>{item.price}</Text>
                   <Text style={styles.sellerName} numberOfLines={1}>
                     {item.sellerName}
                   </Text>
@@ -385,7 +447,7 @@ export const HomeScreen: React.FC = () => {
             ))}
 
             {/* Add Item Card */}
-            <TouchableOpacity style={styles.addItemCard}>
+            <TouchableOpacity style={styles.addItemCard} onPress={() => setShowListingModal(true)}>
               <View style={styles.addItemIconContainer}>
                 <Ionicons name="add" size={32} color="#B06579" />
               </View>
@@ -393,6 +455,66 @@ export const HomeScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showListingModal}
+        animationType="slide"
+        transparent
+        onRequestClose={closeListingModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>List an Item</Text>
+              <TouchableOpacity onPress={closeListingModal}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Item title"
+              value={listingTitle}
+              onChangeText={setListingTitle}
+            />
+            <TextInput
+              style={[styles.modalInput, styles.modalTextarea]}
+              placeholder="Description"
+              value={listingDescription}
+              onChangeText={setListingDescription}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            {listingImage ? (
+              <TouchableOpacity onPress={() => setListingImage(null)} style={styles.imagePreviewWrapper}>
+                <Image source={{ uri: listingImage }} style={styles.imagePreview} />
+                <Text style={styles.removeImageText}>Tap to remove image</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.modalImageButton} onPress={handlePickListingImage}>
+                <Ionicons name="image-outline" size={20} color="#B06579" />
+                <Text style={styles.modalImageButtonText}>Add photo</Text>
+              </TouchableOpacity>
+            )}
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Price"
+              value={listingPrice}
+              onChangeText={setListingPrice}
+              keyboardType="numeric"
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, isListingSaving && { opacity: 0.7 }]}
+              onPress={handleCreateListing}
+              disabled={isListingSaving}
+            >
+              <Text style={styles.modalButtonText}>
+                {isListingSaving ? 'Saving...' : 'Create Listing'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -808,5 +930,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9CA3AF',
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 15,
+    color: '#111827',
+  },
+  modalTextarea: {
+    height: 100,
+  },
+  modalImageButton: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  modalImageButtonText: {
+    color: '#B06579',
+    fontWeight: '600',
+  },
+  imagePreviewWrapper: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 160,
+  },
+  removeImageText: {
+    textAlign: 'center',
+    paddingVertical: 6,
+    fontSize: 12,
+    color: '#B06579',
+    fontWeight: '600',
+  },
+  modalButton: {
+    backgroundColor: '#B06579',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

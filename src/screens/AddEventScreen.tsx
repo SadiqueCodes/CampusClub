@@ -9,6 +9,7 @@ import {
   Image,
   Platform,
   Modal,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +21,9 @@ import { Club } from '../types';
 
 export const AddEventScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { clubs } = useStore();
+  const clubs = useStore((state) => state.clubs);
+  const createEvent = useStore((state) => state.createEvent);
+  const currentUser = useStore((state) => state.currentUser);
 
   const [eventName, setEventName] = useState('');
   const [description, setDescription] = useState('');
@@ -33,6 +36,7 @@ export const AddEventScreen: React.FC = () => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [showClubSelector, setShowClubSelector] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -47,32 +51,45 @@ export const AddEventScreen: React.FC = () => {
     }
   };
 
-  const handleCreateEvent = () => {
-    if (!eventName || !selectedClub) {
+  const handleCreateEvent = async () => {
+    if (!eventName.trim()) {
+      Alert.alert('Missing info', 'Please enter an event name.');
+      return;
+    }
+    if (!selectedClub) {
+      Alert.alert('Select a club', 'Choose which club is hosting this event.');
+      return;
+    }
+    if (!currentUser) {
+      Alert.alert('Not signed in', 'You must be logged in to create an event.');
       return;
     }
 
-    const newEvent = {
-      id: Date.now().toString(),
-      title: eventName,
-      description: description || 'No description provided',
-      clubId: selectedClub.id,
-      clubName: selectedClub.name,
-      date: date,
-      time: time.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }),
-      location: location || 'TBA',
-      bannerImage: posterImage || undefined,
-      interestedUserIds: [],
-      interestedCount: 0,
-      createdBy: '1', // Current user ID
-    };
+    const formattedTime = time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
 
-    useStore.getState().addEvent(newEvent);
-    navigation.goBack();
+    setIsSaving(true);
+    try {
+      await createEvent({
+        title: eventName.trim(),
+        description: description.trim() || 'No description provided',
+        clubId: selectedClub.id,
+        clubName: selectedClub.name,
+        date,
+        time: formattedTime,
+        location: location.trim() || 'TBA',
+        bannerImage: posterImage,
+      });
+      navigation.goBack();
+    } catch (err) {
+      console.error('handleCreateEvent error', err);
+      Alert.alert('Could not create event', 'Please try again in a moment.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -248,8 +265,9 @@ export const AddEventScreen: React.FC = () => {
 
         {/* Create Button */}
         <TouchableOpacity
-          style={styles.createButton}
+          style={[styles.createButton, isSaving && { opacity: 0.7 }]}
           onPress={handleCreateEvent}
+          disabled={isSaving}
         >
           <LinearGradient
             colors={['#E372A1', '#CE678A', '#B06579']}
@@ -257,7 +275,7 @@ export const AddEventScreen: React.FC = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={styles.createButtonText}>Create Event</Text>
+            <Text style={styles.createButtonText}>{isSaving ? 'Creating...' : 'Create Event'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>

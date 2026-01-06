@@ -6,6 +6,8 @@ export { AddEventScreen } from './AddEventScreen';
 export { EventDetailScreen } from './EventDetailScreen';
 export { ManageEventScreen } from './ManageEventScreen';
 export { EventsScreen } from './EventsScreen';
+export { MarketplaceScreen } from './MarketplaceScreen';
+export { MarketplaceDetailScreen } from './MarketplaceDetailScreen';
 export { ChatScreen } from './ChatScreen';
 export { ChatDetailScreen } from './ChatDetailScreen';
 export { ProfileScreen } from './ProfileScreen';

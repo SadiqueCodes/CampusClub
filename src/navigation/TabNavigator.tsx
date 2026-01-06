@@ -16,6 +16,8 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { SearchClubsScreen } from '../screens/SearchClubsScreen';
 import { theme } from '../theme';
+import { MarketplaceScreen } from '../screens/MarketplaceScreen';
+import { MarketplaceDetailScreen } from '../screens/MarketplaceDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -39,6 +41,8 @@ const HomeStackNavigator: React.FC = () => {
       <HomeStack.Screen name="AddEvent" component={AddEventScreen} />
       <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
       <HomeStack.Screen name="Notifications" component={NotificationsScreen} />
+      <HomeStack.Screen name="Marketplace" component={MarketplaceScreen} />
+      <HomeStack.Screen name="MarketplaceDetail" component={MarketplaceDetailScreen} />
     </HomeStack.Navigator>
   );
 };
