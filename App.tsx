@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LoginScreen } from './src/screens';
 import { TabNavigator } from './src/navigation/TabNavigator';
 import { useStore } from './src/store';
-import { View, ActivityIndicator, StyleSheet, Linking } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Linking, Image, Text } from 'react-native';
 import supabase from './src/lib/supabase';
 
 const navigationRef = createNavigationContainerRef<any>();
@@ -112,8 +112,13 @@ export default function App() {
   if (authInitializing) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E372A1" />
+        <View style={styles.splashContainer}>
+          <View style={styles.logoWrap}>
+            <Image source={require('./assets/icon.png')} style={styles.logo} resizeMode="contain" />
+          </View>
+          <Text style={styles.appTitle}>CampusClub</Text>
+          <Text style={styles.appSubtitle}>Connecting your campus community</Text>
+          <ActivityIndicator size="small" color="#E372A1" style={{ marginTop: 18 }} />
         </View>
       </GestureHandlerRootView>
     );
@@ -140,5 +145,37 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  splashContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+  },
+  logoWrap: {
+    width: 120,
+    height: 120,
+    borderRadius: 28,
+    backgroundColor: '#FFF1F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FBCFE8',
+  },
+  logo: {
+    width: 84,
+    height: 84,
+  },
+  appTitle: {
+    marginTop: 18,
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  appSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
 });

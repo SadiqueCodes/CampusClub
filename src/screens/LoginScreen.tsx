@@ -104,7 +104,9 @@ export const LoginScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signUpStep, setSignUpStep] = useState(1);
   const totalSignUpSteps = 3;
@@ -316,6 +318,26 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const targetEmail = forgotEmail.trim().toLowerCase();
+    if (!targetEmail) {
+      Alert.alert('Missing email', 'Enter your email to reset password.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const redirectTo = process.env.MAGIC_LINK_REDIRECT || 'campusclub://auth-callback';
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, { redirectTo });
+      if (error) throw error;
+      Alert.alert('Reset link sent', 'Check your inbox for password reset instructions.');
+      setShowForgotModal(false);
+    } catch (err: any) {
+      Alert.alert('Reset failed', err?.message || 'Could not send reset email.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     if (!validateSignUpStep()) return;
     setLoading(true);
@@ -428,14 +450,13 @@ export const LoginScreen: React.FC = () => {
       </View>
 
       <View style={styles.optionsRow}>
-        <TouchableOpacity style={styles.rememberMe} onPress={() => setRememberMe(!rememberMe)}>
-          <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-            {rememberMe && <Ionicons name="checkmark" size={14} color="#E372A1" />}
-          </View>
-          <Text style={styles.rememberText}>Remember Me</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity>
+        <TouchableOpacity
+          style={styles.forgotLink}
+          onPress={() => {
+            setForgotEmail(email || '');
+            setShowForgotModal(true);
+          }}
+        >
           <Text style={styles.forgotText}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>
@@ -1197,6 +1218,44 @@ colors={['#B06579', '#CE678A', '#E372A1']}
           )}
         </KeyboardAvoidingView>
       </Animated.View>
+
+      <Modal
+        visible={showForgotModal}
+        transparent
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onRequestClose={() => setShowForgotModal(false)}
+      >
+        <View style={styles.forgotModalOverlay}>
+          <View style={styles.forgotModalCard}>
+            <Text style={styles.forgotModalTitle}>Reset Password</Text>
+            <Text style={styles.forgotModalSubtitle}>
+              Enter your account email. We will send you a reset link.
+            </Text>
+            <View style={styles.forgotInputWrapper}>
+              <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="you@college.edu"
+                placeholderTextColor="#DDD"
+                value={forgotEmail}
+                onChangeText={setForgotEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.forgotActions}>
+              <TouchableOpacity style={styles.forgotCancelButton} onPress={() => setShowForgotModal(false)} disabled={forgotLoading}>
+                <Text style={styles.forgotCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.forgotSendButton} onPress={handleForgotPassword} disabled={forgotLoading}>
+                <Text style={styles.forgotSendText}>{forgotLoading ? 'Sending...' : 'Send Link'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1536,31 +1595,12 @@ const styles = StyleSheet.create({
   },
   optionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
     marginTop: 8,
   },
-  rememberMe: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#E372A1',
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#FFF',
-  },
-  rememberText: {
-    fontSize: 13,
-    color: '#636E72',
+  forgotLink: {
+    marginLeft: 'auto',
   },
   forgotText: {
     fontSize: 13,
@@ -1612,6 +1652,76 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  forgotModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  forgotModalCard: {
+    backgroundColor: '#fff',
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  forgotInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 48,
+    backgroundColor: '#FFFFFF',
+  },
+  forgotModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2D3436',
+  },
+  forgotModalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  forgotActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+  },
+  forgotCancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  forgotCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  forgotSendButton: {
+    flex: 1,
+    backgroundColor: '#E372A1',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  forgotSendText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
   modalContainer: {
     backgroundColor: '#fff',

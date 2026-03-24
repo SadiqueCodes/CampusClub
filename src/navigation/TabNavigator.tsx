@@ -77,6 +77,7 @@ const SearchStackNavigator: React.FC = () => {
 export const TabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {

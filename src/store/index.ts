@@ -111,7 +111,7 @@ interface AppState {
   setCurrentUser: (user: User | null) => void;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   login: (profile: Partial<User> & { email: string }) => Promise<void>;
-  signIn: (opts: { email: string; password: string }) => Promise<void>;
+  signIn: (opts: { email: string; password: string; rememberMe?: boolean }) => Promise<void>;
   // Send magic-link (passwordless)
   signInWithMagicLink: (email: string) => Promise<any>;
   signUp: (profile: Partial<User> & { email: string; password: string }) => Promise<void>;
@@ -265,7 +265,7 @@ export const useStore = create<AppState>((set, get) => {
     // session will be established after user clicks the magic link — do not set a mock user here
   },
 
-  signIn: async ({ email, password }) => {
+  signIn: async ({ email, password, rememberMe = true }) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
