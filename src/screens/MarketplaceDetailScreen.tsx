@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -8,9 +8,11 @@ export const MarketplaceDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { itemId } = route.params;
-  const { marketplaceItems, currentUser } = useStore();
+  const { marketplaceItems, currentUser, closeMarketplaceItem } = useStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const item = marketplaceItems.find((i) => i.id === itemId);
+  const formatPrice = (value: number) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
 
   if (!item) {
     return (
@@ -23,7 +25,44 @@ export const MarketplaceDetailScreen: React.FC = () => {
   const isOwnListing = currentUser?.id === item.sellerId;
 
   const handleBuy = () => {
-    Alert.alert('Purchase request sent', `Contact ${item.sellerName} to finalize the deal.`);
+    if (item.status !== 'active') {
+      Alert.alert('Listing closed', 'This listing is no longer active.');
+      return;
+    }
+    const phone = (item.sellerPhone || '').trim();
+    if (!phone) {
+      Alert.alert('Phone unavailable', 'Seller phone number is not available for this listing.');
+      return;
+    }
+    const dialPhone = phone.startsWith('+') ? phone : `+91${phone.replace(/\D/g, '')}`;
+    Linking.openURL(`tel:${dialPhone}`).catch(() => {
+      Alert.alert('Dial failed', 'Could not open phone dialer right now.');
+    });
+  };
+
+  const handleMarkClosed = () => {
+    if (item.status === 'sold') {
+      Alert.alert('Already closed', 'This listing is already marked as closed.');
+      return;
+    }
+    Alert.alert('Close listing', 'Mark this listing as closed?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Close',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setIsSubmitting(true);
+            await closeMarketplaceItem(item.id);
+            navigation.goBack();
+          } catch (e: any) {
+            Alert.alert('Failed', e?.message || 'Could not close listing right now.');
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -50,18 +89,7 @@ export const MarketplaceDetailScreen: React.FC = () => {
         </View>
         <View style={styles.priceTag}>
           <Text style={styles.priceLabel}>Price</Text>
-          <Text style={styles.priceValue}>{item.price}</Text>
-        </View>
-      </View>
-
-      <View style={styles.infoChips}>
-        <View style={styles.infoChip}>
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-          <Text style={styles.infoChipText}>Quality Verified</Text>
-        </View>
-        <View style={styles.infoChip}>
-          <Ionicons name="flash" size={16} color="#F59E0B" />
-          <Text style={styles.infoChipText}>Instant Pickup</Text>
+          <Text style={styles.priceValue}>{formatPrice(item.price)}</Text>
         </View>
       </View>
 
@@ -79,21 +107,33 @@ export const MarketplaceDetailScreen: React.FC = () => {
           <View>
             <Text style={styles.sellerName}>{item.sellerName}</Text>
             <Text style={styles.sellerMeta}>
-              {item.sellerMajor || 'Student'} • {item.sellerYear || 'Year'}
+              {item.sellerMajor || 'Student'} | {item.sellerYear || 'Year'}
             </Text>
           </View>
         </View>
       </View>
 
       {!isOwnListing ? (
-        <TouchableOpacity style={styles.buyButton} onPress={handleBuy}>
-          <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
-          <Text style={styles.buyButtonText}>Contact Seller</Text>
-        </TouchableOpacity>
+        item.status === 'active' ? (
+          <TouchableOpacity style={styles.buyButton} onPress={handleBuy}>
+            <Ionicons name="call" size={18} color="#fff" />
+            <Text style={styles.buyButtonText}>Contact Seller</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.ownerBadge}>
+            <Ionicons name="lock-closed" size={16} color="#fff" />
+            <Text style={styles.ownerBadgeText}>Listing Closed</Text>
+          </View>
+        )
       ) : (
-        <View style={styles.ownerBadge}>
-          <Ionicons name="pricetag" size={16} color="#fff" />
-          <Text style={styles.ownerBadgeText}>This is your listing</Text>
+        <View style={styles.ownerActions}>
+          <TouchableOpacity
+            style={[styles.closeButton, (item.status === 'sold' || isSubmitting) && styles.actionDisabled]}
+            disabled={item.status === 'sold' || isSubmitting}
+            onPress={handleMarkClosed}
+          >
+            <Text style={styles.closeButtonText}>{item.status === 'sold' ? 'Closed' : 'Mark Closed'}</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -103,6 +143,17 @@ export const MarketplaceDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  emptyText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '600',
   },
   backButton: {
     width: 40,
@@ -181,25 +232,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#B06579',
   },
-  infoChips: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  infoChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  infoChipText: {
-    fontSize: 12,
-    color: '#4B5563',
-    fontWeight: '600',
-  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -249,43 +281,55 @@ const styles = StyleSheet.create({
   },
   sellerMeta: {
     color: '#6B7280',
+    marginTop: 2,
   },
   buyButton: {
-    flexDirection: 'row',
+    marginTop: 8,
+    backgroundColor: '#E372A1',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
     gap: 8,
-    backgroundColor: '#B06579',
-    borderRadius: 18,
-    paddingVertical: 16,
-    marginTop: 6,
   },
   buyButtonText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 15,
   },
   ownerBadge: {
-    marginTop: 12,
-    flexDirection: 'row',
+    marginTop: 8,
+    backgroundColor: '#6B7280',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    backgroundColor: '#10B981',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   ownerBadgeText: {
     color: '#fff',
     fontWeight: '700',
+    fontSize: 14,
   },
-  emptyContainer: {
+  ownerActions: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  closeButton: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#E372A1',
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyText: {
-    color: '#6B7280',
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  actionDisabled: {
+    opacity: 0.55,
   },
 });

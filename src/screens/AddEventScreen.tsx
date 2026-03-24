@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   TextInput,
   Image,
   Platform,
@@ -37,13 +38,22 @@ export const AddEventScreen: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [showClubSelector, setShowClubSelector] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const allowProgrammaticLeaveRef = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!isSaving || allowProgrammaticLeaveRef.current) return;
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation, isSaving]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 1,
+      quality: 0.65,
     });
 
     if (!result.canceled) {
@@ -72,6 +82,7 @@ export const AddEventScreen: React.FC = () => {
     });
 
     setIsSaving(true);
+    allowProgrammaticLeaveRef.current = false;
     try {
       await createEvent({
         title: eventName.trim(),
@@ -83,12 +94,19 @@ export const AddEventScreen: React.FC = () => {
         location: location.trim() || 'TBA',
         bannerImage: posterImage,
       });
+      allowProgrammaticLeaveRef.current = true;
       navigation.goBack();
-    } catch (err) {
+    } catch (err: any) {
       console.error('handleCreateEvent error', err);
-      Alert.alert('Could not create event', 'Please try again in a moment.');
+      const msg = String(err?.message || '');
+      if (msg.includes('42501') || msg.toLowerCase().includes('row-level security')) {
+        Alert.alert('Permission blocked', 'Event create was blocked by database policy. Refresh profile/college info or use backend mode.');
+      } else {
+        Alert.alert('Could not create event', 'Please try again in a moment.');
+      }
     } finally {
       setIsSaving(false);
+      allowProgrammaticLeaveRef.current = false;
     }
   };
 
@@ -100,8 +118,12 @@ export const AddEventScreen: React.FC = () => {
         style={styles.header}
       >
         <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          style={[styles.backButton, isSaving && styles.backButtonDisabled]}
+          onPress={() => {
+            if (isSaving) return;
+            navigation.goBack();
+          }}
+          disabled={isSaving}
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
@@ -283,11 +305,16 @@ export const AddEventScreen: React.FC = () => {
       {/* Club Selector Modal */}
       <Modal
         visible={showClubSelector}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
         onRequestClose={() => setShowClubSelector(false)}
       >
-        <View style={styles.modalOverlay}>
+        <TouchableWithoutFeedback onPress={() => setShowClubSelector(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.modalRoot}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Club</Text>
@@ -347,6 +374,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backButtonDisabled: {
+    opacity: 0.55,
   },
   headerTitle: {
     fontSize: 20,
@@ -490,8 +520,11 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  modalRoot: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
   },
   modalContent: {

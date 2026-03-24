@@ -58,6 +58,7 @@ export interface MarketplaceItem {
   images: string[];
   sellerId: string;
   sellerName: string;
+  sellerPhone?: string;
   sellerMajor: string;
   sellerYear: string;
   sellerRating: number;

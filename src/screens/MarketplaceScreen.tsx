@@ -7,19 +7,26 @@ import { MarketplaceItem } from '../types';
 
 export const MarketplaceScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { marketplaceItems } = useStore();
+  const { marketplaceItems, currentUser } = useStore();
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'mine'>('all');
+  const formatPrice = (value: number) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return marketplaceItems;
+    const base =
+      filter === 'mine'
+        ? marketplaceItems.filter((item) => item.sellerId === currentUser?.id && item.status === 'active')
+        : marketplaceItems.filter((item) => item.status === 'active');
+
+    if (!query.trim()) return base;
     const term = query.trim().toLowerCase();
-    return marketplaceItems.filter(
+    return base.filter(
       (item) =>
         item.title.toLowerCase().includes(term) ||
         item.description.toLowerCase().includes(term) ||
         item.sellerName.toLowerCase().includes(term)
     );
-  }, [marketplaceItems, query]);
+  }, [marketplaceItems, query, filter, currentUser?.id]);
 
   const renderItem = ({ item }: { item: MarketplaceItem }) => (
     <TouchableOpacity
@@ -36,10 +43,13 @@ export const MarketplaceScreen: React.FC = () => {
       <Text style={styles.cardTitle} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={styles.cardPrice}>${item.price}</Text>
+      <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
       <Text style={styles.cardSeller} numberOfLines={1}>
         {item.sellerName}
       </Text>
+      {filter === 'mine' && (
+        <Text style={styles.cardStatus}>{(item.status || 'active').toUpperCase()}</Text>
+      )}
     </TouchableOpacity>
   );
 
@@ -57,6 +67,20 @@ export const MarketplaceScreen: React.FC = () => {
           value={query}
           onChangeText={setQuery}
         />
+      </View>
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
+          onPress={() => setFilter('all')}
+        >
+          <Text style={[styles.filterChipText, filter === 'all' && styles.filterChipTextActive]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterChip, filter === 'mine' && styles.filterChipActive]}
+          onPress={() => setFilter('mine')}
+        >
+          <Text style={[styles.filterChipText, filter === 'mine' && styles.filterChipTextActive]}>Posted By Me</Text>
+        </TouchableOpacity>
       </View>
       <FlatList
         data={filtered}
@@ -105,8 +129,36 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#111827',
   },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    marginHorizontal: 20,
+    marginBottom: 10,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  filterChipActive: {
+    backgroundColor: '#E372A1',
+    borderColor: '#E372A1',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
   listContent: {
     padding: 20,
+    paddingTop: 8,
     paddingBottom: 120,
   },
   card: {
@@ -149,5 +201,11 @@ const styles = StyleSheet.create({
   cardSeller: {
     fontSize: 12,
     color: '#6B7280',
+  },
+  cardStatus: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B06579',
   },
 });

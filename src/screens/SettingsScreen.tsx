@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Alert, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../store';
+import { uploadImageToSupabase } from '../lib/storage';
 
 import type { User } from '../types';
 
@@ -13,23 +14,98 @@ const YEAR_OPTIONS: Array<{ label: string; value: User['year'] }> = [
   { label: 'Third Year', value: 'Junior' },
   { label: 'Fourth Year', value: 'Senior' },
 ];
+const SEMESTERS_BY_YEAR: Record<User['year'], Array<{ value: string; label: string }>> = {
+  Freshman: [
+    { value: '1', label: 'Semester 1' },
+    { value: '2', label: 'Semester 2' },
+  ],
+  Sophomore: [
+    { value: '3', label: 'Semester 3' },
+    { value: '4', label: 'Semester 4' },
+  ],
+  Junior: [
+    { value: '5', label: 'Semester 5' },
+    { value: '6', label: 'Semester 6' },
+  ],
+  Senior: [
+    { value: '7', label: 'Semester 7' },
+    { value: '8', label: 'Semester 8' },
+  ],
+};
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { currentUser, setCurrentUser } = useStore();
+  const { currentUser, updateProfile } = useStore();
 
   const [name, setName] = useState(currentUser?.name ?? '');
   const [email, setEmail] = useState(currentUser?.email ?? '');
   const [major, setMajor] = useState(currentUser?.major ?? '');
-  const [collegeId, setCollegeId] = useState(currentUser?.collegeId ?? '');
   const [year, setYear] = useState<'Freshman' | 'Sophomore' | 'Junior' | 'Senior'>(currentUser?.year ?? 'Freshman');
+  const [semester, setSemester] = useState(currentUser?.semester ?? '1');
   const [avatar, setAvatar] = useState(currentUser?.profilePhoto);
   const [interests, setInterests] = useState<string[]>(currentUser?.interests ?? []);
   const [interestInput, setInterestInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [pendingLeaveAction, setPendingLeaveAction] = useState<any>(null);
 
   if (!currentUser) return null;
 
-  const pickImage = async () => {
+  const semesterOptions = useMemo(() => SEMESTERS_BY_YEAR[year], [year]);
+  const normalizedCurrentInterests = useMemo(
+    () => [...(currentUser.interests || [])].map((i) => i.trim()).filter(Boolean).sort().join('|'),
+    [currentUser.interests]
+  );
+  const normalizedDraftInterests = useMemo(
+    () => [...interests].map((i) => i.trim()).filter(Boolean).sort().join('|'),
+    [interests]
+  );
+  const hasUnsavedChanges = useMemo(() => {
+    return (
+      name.trim() !== (currentUser.name || '').trim() ||
+      email.trim() !== (currentUser.email || '').trim() ||
+      major.trim() !== (currentUser.major || '').trim() ||
+      year !== (currentUser.year || 'Freshman') ||
+      semester !== (currentUser.semester || '1') ||
+      (avatar || '') !== (currentUser.profilePhoto || '') ||
+      normalizedDraftInterests !== normalizedCurrentInterests
+    );
+  }, [
+    avatar,
+    currentUser.email,
+    currentUser.major,
+    currentUser.name,
+    currentUser.profilePhoto,
+    currentUser.semester,
+    currentUser.year,
+    email,
+    major,
+    name,
+    normalizedCurrentInterests,
+    normalizedDraftInterests,
+    semester,
+    year,
+  ]);
+
+  useEffect(() => {
+    if (!semesterOptions.some((option) => option.value === semester)) {
+      setSemester(semesterOptions[0].value);
+    }
+  }, [semester, semesterOptions]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!hasUnsavedChanges || isSaving) return;
+      e.preventDefault();
+      setPendingLeaveAction(e.data.action);
+      setLeaveModalVisible(true);
+    });
+    return unsubscribe;
+  }, [hasUnsavedChanges, isSaving, navigation]);
+
+  const pickFromLibrary = async () => {
+    setPhotoModalVisible(false);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission needed', 'Allow photo access to change your picture.');
@@ -37,7 +113,7 @@ export const SettingsScreen: React.FC = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -48,24 +124,102 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
-    setCurrentUser({
-      ...currentUser,
-      name,
-      email,
-      major,
-      collegeId,
-      year,
-      profilePhoto: avatar,
-      interests,
+  const pickFromCamera = async () => {
+    setPhotoModalVisible(false);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Allow camera access to take a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
     });
+
+    if (!result.canceled && result.assets?.length) {
+      setAvatar(result.assets[0].uri);
+    }
+  };
+
+  const pickImage = () => setPhotoModalVisible(true);
+  const removePhoto = () => {
+    setPhotoModalVisible(false);
+    setAvatar(undefined);
+  };
+
+  const handleSave = async (onSuccess?: () => void) => {
+    setIsSaving(true);
+    try {
+      let profilePhotoToSave = avatar;
+      if (profilePhotoToSave && /^file:\/\//i.test(profilePhotoToSave)) {
+        try {
+          profilePhotoToSave = await uploadImageToSupabase(profilePhotoToSave, `profiles/${currentUser.id}`);
+        } catch (uploadErr: any) {
+          Alert.alert('Upload failed', uploadErr?.message || 'Could not upload profile photo');
+          return;
+        }
+      }
+      await updateProfile({
+        name,
+        email,
+        major,
+        year,
+        semester,
+        profilePhoto: profilePhotoToSave,
+        interests,
+      });
+      onSuccess?.();
+      if (!onSuccess) {
+        navigation.goBack();
+      }
+    } catch (err: any) {
+      Alert.alert('Save failed', err?.message || 'Could not update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBackPress = () => {
+    if (isSaving) return;
+    if (!hasUnsavedChanges) {
+      navigation.goBack();
+      return;
+    }
+    setPendingLeaveAction(null);
+    setLeaveModalVisible(true);
+  };
+
+  const leaveWithoutSaving = () => {
+    setLeaveModalVisible(false);
+    if (pendingLeaveAction) {
+      const action = pendingLeaveAction;
+      setPendingLeaveAction(null);
+      navigation.dispatch(action);
+      return;
+    }
     navigation.goBack();
+  };
+
+  const saveAndLeave = async () => {
+    await handleSave(() => {
+      setLeaveModalVisible(false);
+      if (pendingLeaveAction) {
+        const action = pendingLeaveAction;
+        setPendingLeaveAction(null);
+        navigation.dispatch(action);
+      } else {
+        navigation.goBack();
+      }
+    });
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -78,7 +232,12 @@ export const SettingsScreen: React.FC = () => {
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatarImage} />
             ) : (
-              <Text style={styles.avatarInitial}>{currentUser.name.charAt(0)}</Text>
+              <>
+                <Text style={styles.avatarInitial}>{currentUser.name.charAt(0)}</Text>
+                <View style={styles.avatarAddBadge}>
+                  <Ionicons name="add" size={18} color="#fff" />
+                </View>
+              </>
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={pickImage}>
@@ -114,16 +273,6 @@ export const SettingsScreen: React.FC = () => {
             value={major}
             onChangeText={setMajor}
             placeholder="Major"
-          />
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>College ID</Text>
-          <TextInput
-            style={styles.input}
-            value={collegeId}
-            onChangeText={setCollegeId}
-            placeholder="Student ID"
           />
         </View>
 
@@ -182,14 +331,105 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Semester</Text>
+          <View style={styles.yearRow}>
+            {semesterOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.yearChip, semester === option.value && styles.yearChipActive]}
+                onPress={() => setSemester(option.value)}
+              >
+                <Text style={[styles.yearChipText, semester === option.value && styles.yearChipTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <TouchableOpacity
-          style={[styles.saveButton, (!name.trim() || !email.trim()) && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={!name.trim() || !email.trim()}
+          style={[styles.saveButton, (!name.trim() || !email.trim() || !semester || isSaving) && styles.saveButtonDisabled]}
+          onPress={() => handleSave()}
+          disabled={!name.trim() || !email.trim() || !semester || isSaving}
         >
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          {isSaving ? (
+            <View style={styles.saveButtonLoadingRow}>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.saveButtonText}>Saving...</Text>
+            </View>
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={photoModalVisible}
+        onRequestClose={() => setPhotoModalVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setPhotoModalVisible(false)}>
+          <Pressable style={styles.photoModalCard} onPress={() => {}}>
+            <Text style={styles.photoModalTitle}>Profile Photo</Text>
+            <Text style={styles.photoModalSubtitle}>Choose how to update your profile image</Text>
+
+            <TouchableOpacity style={styles.photoActionBtn} onPress={pickFromCamera}>
+              <Ionicons name="camera-outline" size={18} color="#1F2937" />
+              <Text style={styles.photoActionText}>Open Camera</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.photoActionBtn} onPress={pickFromLibrary}>
+              <Ionicons name="images-outline" size={18} color="#1F2937" />
+              <Text style={styles.photoActionText}>Choose from Library</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.photoActionBtn, !avatar && styles.photoActionDisabled]}
+              onPress={removePhoto}
+              disabled={!avatar}
+            >
+              <Ionicons name="trash-outline" size={18} color={avatar ? '#DC2626' : '#9CA3AF'} />
+              <Text style={[styles.photoActionText, avatar ? styles.removePhotoText : styles.disabledPhotoText]}>
+                Remove Photo
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.photoCancelBtn} onPress={() => setPhotoModalVisible(false)}>
+              <Text style={styles.photoCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={leaveModalVisible}
+        onRequestClose={() => setLeaveModalVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setLeaveModalVisible(false)}>
+          <Pressable style={styles.leaveModalCard} onPress={() => {}}>
+            <Text style={styles.leaveModalTitle}>Save changes?</Text>
+            <Text style={styles.leaveModalSubtitle}>
+              You have unsaved profile changes. Do you want to save before leaving?
+            </Text>
+            <View style={styles.leaveBtnRow}>
+              <TouchableOpacity style={styles.leaveNoBtn} onPress={leaveWithoutSaving}>
+                <Text style={styles.leaveNoText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.leaveYesBtn, isSaving && styles.saveButtonDisabled]}
+                onPress={saveAndLeave}
+                disabled={isSaving || !name.trim() || !email.trim() || !semester}
+              >
+                <Text style={styles.leaveYesText}>{isSaving ? 'Saving...' : 'Yes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -250,11 +490,23 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 60,
   },
   avatarInitial: {
     fontSize: 48,
     fontWeight: '800',
     color: '#B06579',
+  },
+  avatarAddBadge: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#B06579',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   changePhotoText: {
     fontSize: 14,
@@ -369,4 +621,114 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
+  saveButtonLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.62)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  photoModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    gap: 10,
+  },
+  photoModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  photoModalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  photoActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  photoActionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  removePhotoText: {
+    color: '#DC2626',
+  },
+  photoActionDisabled: {
+    backgroundColor: '#F9FAFB',
+  },
+  disabledPhotoText: {
+    color: '#9CA3AF',
+  },
+  photoCancelBtn: {
+    marginTop: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  photoCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  leaveModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    gap: 12,
+  },
+  leaveModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  leaveModalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  leaveBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  leaveNoBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  leaveNoText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  leaveYesBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#B06579',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  leaveYesText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
 });
+
+

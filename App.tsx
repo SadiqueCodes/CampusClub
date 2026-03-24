@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LoginScreen } from './src/screens';
 import { TabNavigator } from './src/navigation/TabNavigator';
@@ -8,12 +8,38 @@ import { useStore } from './src/store';
 import { View, ActivityIndicator, StyleSheet, Linking } from 'react-native';
 import supabase from './src/lib/supabase';
 
+const navigationRef = createNavigationContainerRef<any>();
+
 export default function App() {
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const initializeAuth = useStore((s) => s.initializeAuth);
   const authInitializing = useStore((s) => s.authInitializing);
+  const pendingEventIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const parseEventIdFromUrl = (url: string) => {
+      try {
+        const noScheme = url.replace(/^[a-zA-Z]+:\/\//, '');
+        const pathPart = noScheme.split(/[?#]/)[0] || '';
+        const parts = pathPart.split('/').filter(Boolean);
+        if (parts[0]?.toLowerCase() === 'event' && parts[1]) {
+          return decodeURIComponent(parts[1]);
+        }
+      } catch (e) {
+        // ignore parse errors
+      }
+      return null;
+    };
+
+    const tryNavigateToEvent = (eventId: string) => {
+      if (!navigationRef.isReady()) return false;
+      navigationRef.navigate('Home', {
+        screen: 'EventDetail',
+        params: { eventId },
+      });
+      return true;
+    };
+
     initializeAuth();
 
     // Deep link handler: capture auth redirects from email magic links.
@@ -36,6 +62,12 @@ export default function App() {
     const handleUrl = async (event: { url: string } | string) => {
       const url = typeof event === 'string' ? event : event.url;
       if (!url) return;
+      const eventId = parseEventIdFromUrl(url);
+      if (eventId) {
+        if (!(isAuthenticated && tryNavigateToEvent(eventId))) {
+          pendingEventIdRef.current = eventId;
+        }
+      }
       const { access_token, refresh_token } = parseParamsFromUrl(url);
       if (access_token && refresh_token) {
         try {
@@ -65,7 +97,17 @@ export default function App() {
     const subscription = Linking.addEventListener('url', handleUrl as any);
     return () => subscription.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initializeAuth, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !navigationRef.isReady()) return;
+    if (!pendingEventIdRef.current) return;
+    navigationRef.navigate('Home', {
+      screen: 'EventDetail',
+      params: { eventId: pendingEventIdRef.current },
+    });
+    pendingEventIdRef.current = null;
+  }, [isAuthenticated]);
 
   if (authInitializing) {
     return (
@@ -79,7 +121,17 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          if (!isAuthenticated || !pendingEventIdRef.current) return;
+          navigationRef.navigate('Home', {
+            screen: 'EventDetail',
+            params: { eventId: pendingEventIdRef.current },
+          });
+          pendingEventIdRef.current = null;
+        }}
+      >
         <StatusBar style="auto" />
         {isAuthenticated ? <TabNavigator /> : <LoginScreen />}
       </NavigationContainer>

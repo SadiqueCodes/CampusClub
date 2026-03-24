@@ -9,6 +9,7 @@ import chatsRouter from './routes/chats';
 import messagesRouter from './routes/messages';
 import joinRequestsRouter from './routes/joinRequests';
 import usersRouter from './routes/users';
+import gifsRouter from './routes/gifs';
 import { requireAuth } from './middleware/auth';
 import errorHandler from './middleware/errorHandler';
 
@@ -33,11 +34,12 @@ app.use('/api/chats', chatsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/join-requests', joinRequestsRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/gifs', gifsRouter);
 
 // Error handler (last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   // Do not print secrets
   console.log(`CampusClub backend listening on port ${PORT}`);
 });

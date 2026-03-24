@@ -8,17 +8,22 @@ const router = Router();
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { chat_id, text } = req.body;
+    const { chat_id, text, attachments } = req.body;
+    const safeText = typeof text === 'string' ? text : '';
+    const safeAttachments = Array.isArray(attachments)
+      ? attachments.filter((a: any) => typeof a === 'string' && a.trim().length > 0)
+      : [];
 
-    if (!chat_id || !text) {
-      return res.status(400).json({ error: 'chat_id and text are required' });
+    if (!chat_id || (!safeText.trim() && safeAttachments.length === 0)) {
+      return res.status(400).json({ error: 'chat_id and either text or attachments are required' });
     }
 
     const messageRow = {
       chat_id,
       sender_id: user.id,
       sender_name: user.user_metadata?.name || user.email || 'Member',
-      text,
+      text: safeText || null,
+      attachments: safeAttachments,
       timestamp: new Date(),
     };
 

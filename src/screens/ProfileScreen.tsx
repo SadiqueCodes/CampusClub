@@ -1,18 +1,56 @@
-import React from 'react';
+﻿import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const ProfileScreen: React.FC = () => {
-  const { currentUser, myClubs, logout } = useStore();
+  const { currentUser, myClubs, myListings, chats, clubs, events, logout } = useStore();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const yearLabelMap: Record<string, string> = {
     Freshman: 'First Year',
     Sophomore: 'Second Year',
     Junior: 'Third Year',
     Senior: 'Fourth Year',
+  };
+  const formatPrice = (value: number) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
+  const profileClubIds = currentUser?.clubsJoined || [];
+  const fallbackProfileClubs = useMemo(() => {
+    if (!currentUser) return [];
+    return clubs.filter(
+      (club) =>
+        profileClubIds.includes(club.id) ||
+        (currentUser.clubsLeading || []).includes(club.id) ||
+        club.leaderId === currentUser.id
+    );
+  }, [clubs, currentUser, profileClubIds]);
+  const visibleProfileClubs = myClubs.length > 0 ? myClubs : fallbackProfileClubs;
+  const clubCount = Math.max(
+    myClubs.length,
+    fallbackProfileClubs.length,
+    (currentUser?.clubsJoined || []).length,
+    (currentUser?.clubsLeading || []).length
+  );
+  const attendedFromEvents = events.filter((event) =>
+    (event.interestedUserIds || []).includes(currentUser?.id || '')
+  ).length;
+  const profileEventCount = Math.max(
+    Number(currentUser?.eventsAttended || 0),
+    attendedFromEvents
+  );
+  const openClubFromProfile = (clubId: string) => {
+    const clubChat = chats.find((chat) => chat.clubId === clubId);
+    if (clubChat) {
+      navigation.navigate('Clubs', {
+        screen: 'ClubChatDetail',
+        params: { chatId: clubChat.id },
+      });
+      return;
+    }
+    navigation.navigate('Clubs');
   };
 
   if (!currentUser) {
@@ -41,13 +79,10 @@ export const ProfileScreen: React.FC = () => {
     <View style={styles.container}>
       <LinearGradient
         colors={['#E372A1', '#CE678A', '#B06579']}
-        style={styles.headerGradient}
+        style={[styles.headerGradient, { paddingTop: Math.max(insets.top + 8, 48) }]}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Profile</Text>
-            <Text style={styles.headerSubtitle}>{currentUser.collegeName}</Text>
-          </View>
+          <Text style={styles.headerTitle}>Profile</Text>
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => navigation.navigate('ProfileSettings')}
@@ -60,25 +95,30 @@ export const ProfileScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
           <View style={styles.profileRow}>
-            <View style={styles.profileAvatar}>
+            <TouchableOpacity
+              style={styles.profileAvatar}
+              onPress={() => navigation.navigate('ProfileSettings')}
+              activeOpacity={0.85}
+            >
               {currentUser.profilePhoto ? (
                 <Image source={{ uri: currentUser.profilePhoto }} style={styles.profilePhotoImage} />
               ) : (
-                <Text style={styles.profileInitial}>{currentUser.name.charAt(0)}</Text>
+                <>
+                  <Text style={styles.profileInitial}>{currentUser.name.charAt(0)}</Text>
+                  <View style={styles.addPhotoBadge}>
+                    <Ionicons name="add" size={14} color="#fff" />
+                  </View>
+                </>
               )}
-            </View>
+            </TouchableOpacity>
             <View style={styles.profileDetails}>
               <Text style={styles.name}>{currentUser.name}</Text>
               <Text style={styles.metaText}>
-                {currentUser.major} • {yearLabelMap[currentUser.year] || currentUser.year} • Sem {currentUser.semester}
+                {yearLabelMap[currentUser.year] || currentUser.year} - Sem {currentUser.semester}
               </Text>
               <View style={styles.detailRow}>
                 <Ionicons name="mail-outline" size={16} color="#B06579" />
                 <Text style={styles.detailText}>{currentUser.email}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="card-outline" size={16} color="#B06579" />
-                <Text style={styles.detailText}>{currentUser.collegeId}</Text>
               </View>
             </View>
           </View>
@@ -86,31 +126,33 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.snapshotRow}>
           <View style={styles.snapshotChip}>
             <Text style={styles.snapshotLabel}>Clubs</Text>
-            <Text style={styles.snapshotValue}>{myClubs.length}</Text>
+            <Text style={styles.snapshotValue}>{clubCount}</Text>
           </View>
           <View style={styles.snapshotChip}>
             <Text style={styles.snapshotLabel}>Events</Text>
-            <Text style={styles.snapshotValue}>{currentUser.eventsAttended}</Text>
+            <Text style={styles.snapshotValue}>{profileEventCount}</Text>
           </View>
           <View style={styles.snapshotChip}>
             <Text style={styles.snapshotLabel}>Listings</Text>
-            <Text style={styles.snapshotValue}>{currentUser.totalTransactions}</Text>
+            <Text style={styles.snapshotValue}>{myListings.length}</Text>
           </View>
         </View>
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionCardHeader}>
             <Text style={styles.sectionTitle}>My Clubs</Text>
-            <Text style={styles.sectionSubtitle}>{myClubs.length} total</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Clubs')}>
+              <Text style={styles.sectionAction}>View all</Text>
+            </TouchableOpacity>
           </View>
-          {myClubs.length === 0 ? (
+          {visibleProfileClubs.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="people-outline" size={36} color="#D1D5DB" />
               <Text style={styles.emptyText}>You haven't joined any clubs yet</Text>
             </View>
           ) : (
-            myClubs.map((club) => (
-              <View key={club.id} style={styles.clubRow}>
+            visibleProfileClubs.slice(0, 3).map((club) => (
+              <TouchableOpacity key={club.id} style={styles.clubRow} onPress={() => openClubFromProfile(club.id)}>
                 <View>
                   <Text style={styles.clubName}>{club.name}</Text>
                   <Text style={styles.clubType}>{club.type}</Text>
@@ -121,7 +163,7 @@ export const ProfileScreen: React.FC = () => {
                     <Text style={styles.leaderBadgeText}>Lead</Text>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -129,30 +171,42 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.sectionCard}>
           <View style={styles.sectionCardHeader}>
             <Text style={styles.sectionTitle}>Listings</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Home', { screen: 'Marketplace' })}>
               <Text style={styles.sectionAction}>View all</Text>
             </TouchableOpacity>
           </View>
-          {['Camera', 'Laptop', 'Textbook'].map((item, index) => (
-            <View key={item} style={styles.listingRow}>
-              <View style={styles.listingChip}>
-                <Ionicons
-                  name={index === 0 ? 'camera-outline' : index === 1 ? 'laptop-outline' : 'book-outline'}
-                  size={18}
-                  color="#B06579"
-                />
-              </View>
-              <View style={styles.listingInfo}>
-                <Text style={styles.listingTitle}>{item}</Text>
-                <Text style={styles.listingPrice}>{index === 0 ? '$120' : index === 1 ? '$450' : '$30'}</Text>
-              </View>
-              <View style={[styles.listingStatusBadge, index === 2 && styles.soldBadge]}>
-                <Text style={[styles.listingStatusText, index === 2 && styles.soldText]}>
-                  {index === 2 ? 'Sold' : 'Active'}
-                </Text>
-              </View>
+          {myListings.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="pricetag-outline" size={36} color="#D1D5DB" />
+              <Text style={styles.emptyText}>You haven't listed anything yet</Text>
             </View>
-          ))}
+          ) : (
+            myListings.slice(0, 3).map((item) => {
+              const isSold = item.status === 'sold';
+              const iconName =
+                item.title.toLowerCase().includes('camera')
+                  ? 'camera-outline'
+                  : item.title.toLowerCase().includes('book')
+                  ? 'book-outline'
+                  : 'pricetag-outline';
+              return (
+                <View key={item.id} style={styles.listingRow}>
+                  <View style={styles.listingChip}>
+                    <Ionicons name={iconName as any} size={18} color="#B06579" />
+                  </View>
+                  <View style={styles.listingInfo}>
+                    <Text style={styles.listingTitle}>{item.title}</Text>
+                    <Text style={styles.listingPrice}>{formatPrice(item.price)}</Text>
+                  </View>
+                  <View style={[styles.listingStatusBadge, isSold && styles.soldBadge]}>
+                    <Text style={[styles.listingStatusText, isSold && styles.soldText]}>
+                      {isSold ? 'Closed' : 'Active'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.sectionCard}>
@@ -208,8 +262,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 12,
+    zIndex: 2,
   },
   profileCard: {
     backgroundColor: '#fff',
@@ -231,20 +288,33 @@ const styles = StyleSheet.create({
   profileAvatar: {
     width: 72,
     height: 72,
-    borderRadius: 24,
+    borderRadius: 36,
     backgroundColor: '#FDF2F8',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
   },
   profilePhotoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 36,
   },
   profileInitial: {
     fontSize: 36,
     fontWeight: '800',
     color: '#B06579',
+  },
+  addPhotoBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#B06579',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileDetails: {
     flex: 1,
@@ -534,3 +604,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
+

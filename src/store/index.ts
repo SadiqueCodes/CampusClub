@@ -7,6 +7,12 @@ import { uploadImageToSupabase } from '../lib/storage';
 
 // Runtime map of active realtime subscriptions by chatId
 const _realtimeSubscriptions = new Map<string, any>();
+const _realtimeRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const _activeRealtimeChatIds = new Set<string>();
+const _realtimeRetryCounts = new Map<string, number>();
+const _realtimeLastClosedWarnAt = new Map<string, number>();
+const _realtimeClosedCountWindow = new Map<string, { count: number; windowStartMs: number }>();
+const _realtimePausedUntil = new Map<string, number>();
 let marketplaceChannel: any = null;
 
 const normalizeEventRow = (row: any): Event => ({
@@ -35,7 +41,9 @@ const normalizeClubRow = (row: any): Club => ({
   memberCount: row.member_count ?? row.memberCount ?? 0,
   createdAt: row.created_at ? new Date(row.created_at) : new Date(),
   groupChatId: row.group_chat_id || row.groupChatId || '',
+  logo: row.logo || undefined,
   logoEmoji: row.logo_emoji || row.logoEmoji || '👥',
+  coverPhoto: row.cover_photo || row.coverPhoto || undefined,
   upcomingEvents: row.upcoming_events ?? row.upcomingEvents ?? 0,
 });
 
@@ -44,7 +52,7 @@ const normalizeMessageRow = (row: any): Message => ({
   chatId: row.chat_id || row.chatId,
   senderId: row.sender_id || row.senderId,
   senderName: row.sender_name || row.senderName,
-  text: row.text,
+  text: row.text || '',
   timestamp: row.timestamp ? new Date(row.timestamp) : new Date(),
   attachments: row.attachments,
 });
@@ -69,6 +77,7 @@ const normalizeMarketplaceRow = (row: any): MarketplaceItem => ({
   images: row.images || [],
   sellerId: row.seller_id || row.sellerId || '',
   sellerName: row.seller_name || row.sellerName || '',
+  sellerPhone: row.seller_phone || row.sellerPhone || undefined,
   sellerMajor: row.seller_major || row.sellerMajor || '',
   sellerYear: row.seller_year || row.sellerYear || '',
   sellerRating: row.seller_rating ?? row.sellerRating ?? 0,
@@ -100,6 +109,7 @@ interface AppState {
   isAuthenticated: boolean;
   authInitializing: boolean;
   setCurrentUser: (user: User | null) => void;
+  updateProfile: (updates: Partial<User>) => Promise<void>;
   login: (profile: Partial<User> & { email: string }) => Promise<void>;
   signIn: (opts: { email: string; password: string }) => Promise<void>;
   // Send magic-link (passwordless)
@@ -144,7 +154,10 @@ interface AppState {
     description: string;
     price: number;
     imageUris?: string[];
+    sellerPhone: string;
   }) => Promise<MarketplaceItem>;
+  closeMarketplaceItem: (itemId: string) => Promise<void>;
+  deleteMarketplaceItem: (itemId: string) => Promise<void>;
   subscribeToMarketplace: () => void;
   unsubscribeFromMarketplace: () => void;
 
@@ -164,7 +177,7 @@ interface AppState {
   getMessagesForChat: (chatId: string) => Message[];
   fetchMessagesForChat: (chatId: string) => Promise<void>;
   // Optimistic send with retry/backoff
-  sendMessage: (chatId: string, text: string) => Promise<void>;
+  sendMessage: (chatId: string, text: string, attachments?: string[]) => Promise<void>;
 
   // Fetch helpers (async)
   fetchClubs: () => Promise<void>;
@@ -211,6 +224,36 @@ export const useStore = create<AppState>((set, get) => {
 
   setCurrentUser: (user) => set({ currentUser: user, isAuthenticated: !!user }),
 
+  updateProfile: async (updates) => {
+    const current = get().currentUser;
+    if (!current) throw new Error('Not authenticated');
+
+    const nextUser: User = { ...current, ...updates };
+    const dbUpdates: Record<string, any> = {
+      name: nextUser.name,
+      email: nextUser.email,
+      college_id: nextUser.collegeId || null,
+      college_name: nextUser.collegeName || null,
+      major: nextUser.major || null,
+      year: nextUser.year || null,
+      semester: nextUser.semester || null,
+      profile_photo: nextUser.profilePhoto || null,
+      interests: nextUser.interests || [],
+      clubs_joined: nextUser.clubsJoined || [],
+      clubs_leading: nextUser.clubsLeading || [],
+      events_attended: nextUser.eventsAttended || 0,
+      rating: nextUser.rating || 0,
+      total_transactions: nextUser.totalTransactions || 0,
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: current.id, ...dbUpdates });
+    if (error) throw error;
+
+    set({ currentUser: nextUser, isAuthenticated: true });
+  },
+
   // legacy login kept for compatibility
   login: async (profile) => {
     if ((profile as any).password) {
@@ -246,12 +289,18 @@ export const useStore = create<AppState>((set, get) => {
         const uid = userInfo.user.id;
         // Ensure a profile row exists in the database for this user. If missing, create a minimal profile
         try {
+          const metaCollegeId = userInfo.user.user_metadata?.college_id
+            ? String(userInfo.user.user_metadata.college_id).trim()
+            : '';
+          const metaCollegeName = userInfo.user.user_metadata?.college_name
+            ? String(userInfo.user.user_metadata.college_name).trim()
+            : '';
           const minimal = {
             id: uid,
             name: userInfo.user.user_metadata?.name || 'Student',
             email: userInfo.user.email || email,
-            college_id: '',
-            college_name: '',
+            college_id: metaCollegeId,
+            college_name: metaCollegeName,
             major: '',
             year: 'Freshman',
           } as any;
@@ -289,9 +338,22 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
 
-  signUp: async (profile) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({ email: profile.email, password: profile.password!, options: { data: { name: profile.name } } });
+    signUp: async (profile) => {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: profile.email,
+          password: profile.password!,
+          options: {
+            data: {
+              name: profile.name,
+              college_id: profile.collegeId || '',
+              college_name: profile.collegeName || '',
+              year: profile.year || 'Freshman',
+              semester: profile.semester || '1',
+              interests: profile.interests || [],
+            },
+          },
+        });
       if (error) throw error;
 
       const uid = (data as any).user?.id;
@@ -300,15 +362,18 @@ export const useStore = create<AppState>((set, get) => {
         await secureStore.setItem('supabase_session', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }));
       }
 
-      if (uid) {
-        const newProfile = {
-          id: uid,
-          name: profile.name || '',
-          email: profile.email,
-          college_id: profile.collegeId || '',
-          college_name: profile.collegeName || '',
-          major: profile.major || '',
-        } as any;
+        if (uid) {
+          const newProfile = {
+            id: uid,
+            name: profile.name || '',
+            email: profile.email,
+            college_id: profile.collegeId || '',
+            college_name: profile.collegeName || '',
+            major: profile.major || '',
+            year: profile.year || 'Freshman',
+            semester: profile.semester || '1',
+            interests: profile.interests || [],
+          } as any;
         await supabase.from('profiles').upsert(newProfile);
         const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', uid).single();
         if (profileRow) {
@@ -350,12 +415,18 @@ export const useStore = create<AppState>((set, get) => {
           // Try to create a minimal profile row if missing
           try {
             const uid = userData.user.id;
+            const metaCollegeId = userData.user.user_metadata?.college_id
+              ? String(userData.user.user_metadata.college_id).trim()
+              : '';
+            const metaCollegeName = userData.user.user_metadata?.college_name
+              ? String(userData.user.user_metadata.college_name).trim()
+              : '';
             const minimal = {
               id: uid,
               name: userData.user.user_metadata?.name || 'Student',
               email: userData.user.email || '',
-              college_id: '',
-              college_name: '',
+              college_id: metaCollegeId,
+              college_name: metaCollegeName,
               major: '',
               year: 'Freshman',
             } as any;
@@ -446,8 +517,9 @@ export const useStore = create<AppState>((set, get) => {
   clubs: [],
   get myClubs() {
     const state = get();
+    const userId = state.currentUser?.id || '';
     return state.clubs.filter((club) =>
-      club.memberIds.includes(state.currentUser?.id || '')
+      club.memberIds.includes(userId) || club.leaderId === userId
     );
   },
 
@@ -469,10 +541,37 @@ export const useStore = create<AppState>((set, get) => {
       clubs: [...state.clubs, club],
     })),
 
-  updateClub: (clubId, updates) =>
+  updateClub: (clubId, updates) => {
     set((state) => ({
       clubs: state.clubs.map((c) => (c.id === clubId ? { ...c, ...updates } : c)),
-    })),
+    }));
+
+    const dbUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.leaderId !== undefined) dbUpdates.leader_id = updates.leaderId;
+    if (updates.leaderName !== undefined) dbUpdates.leader_name = updates.leaderName;
+    if (updates.memberIds !== undefined) dbUpdates.member_ids = updates.memberIds;
+    if (updates.memberCount !== undefined) dbUpdates.member_count = updates.memberCount;
+    if (updates.groupChatId !== undefined) dbUpdates.group_chat_id = updates.groupChatId;
+    if (updates.logo !== undefined) dbUpdates.logo = updates.logo;
+    if (updates.logoEmoji !== undefined) dbUpdates.logo_emoji = updates.logoEmoji;
+    if (updates.coverPhoto !== undefined) dbUpdates.cover_photo = updates.coverPhoto;
+    if (updates.upcomingEvents !== undefined) dbUpdates.upcoming_events = updates.upcomingEvents;
+    if (updates.createdAt !== undefined) dbUpdates.created_at = updates.createdAt.toISOString();
+
+    if (Object.keys(dbUpdates).length === 0) return;
+
+    (async () => {
+      try {
+        const { error } = await supabase.from('clubs').update(dbUpdates).eq('id', clubId);
+        if (error) throw error;
+      } catch (err) {
+        console.warn('updateClub supabase update failed', err);
+      }
+    })();
+  },
 
   addMemberToClub: async (clubId, userId) => {
     const state = get();
@@ -508,6 +607,45 @@ export const useStore = create<AppState>((set, get) => {
     if (!currentUser) {
       throw new Error('Not authenticated');
     }
+    let resolvedBannerImage: string | null = payload.bannerImage || null;
+    if (resolvedBannerImage && !/^https?:\/\//i.test(resolvedBannerImage)) {
+      try {
+        resolvedBannerImage = await uploadImageToSupabase(
+          resolvedBannerImage,
+          `event-banners/${payload.clubId}/${currentUser.id}`
+        );
+      } catch (uploadErr) {
+        console.error('event banner upload failed', uploadErr);
+        throw new Error('Could not upload event poster');
+      }
+    }
+
+    const api = await import('../lib/api');
+    if (api.isBackendConfigured()) {
+      try {
+        const res = await api.createEvent({
+          title: payload.title,
+          description: payload.description,
+          club_id: payload.clubId,
+          club_name: payload.clubName,
+          college_id: currentUser.collegeId || null,
+          college_name: currentUser.collegeName || null,
+          date: payload.date.toISOString(),
+          time: payload.time,
+          location: payload.location,
+          banner_image: resolvedBannerImage,
+          created_by: currentUser.id,
+        });
+        const created = (res as any).data || res;
+        const normalized = normalizeEventRow(created);
+        set((state) => ({ events: [...state.events, normalized] }));
+        return normalized;
+      } catch (error) {
+        console.error('createEvent backend error', error);
+        throw error;
+      }
+    }
+
     const eventToInsert = {
       title: payload.title,
       description: payload.description,
@@ -516,42 +654,27 @@ export const useStore = create<AppState>((set, get) => {
       date: payload.date.toISOString(),
       time: payload.time,
       location: payload.location,
-      banner_image: payload.bannerImage || null,
+      banner_image: resolvedBannerImage,
       interested_user_ids: [],
       interested_count: 0,
       created_by: currentUser.id,
+      college_id: currentUser.collegeId || null,
+      college_name: currentUser.collegeName || null,
     };
 
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .insert(eventToInsert)
-        .select('*')
-        .single();
-      if (error) throw error;
-
-      const normalized = normalizeEventRow(data);
-      set((state) => ({ events: [...state.events, normalized] }));
-      return normalized;
-    } catch (err) {
-      console.error('createEvent error', err);
-      const fallback: Event = {
-        id: `local_event_${Date.now()}`,
-        title: payload.title,
-        description: payload.description,
-        clubId: payload.clubId,
-        clubName: payload.clubName,
-        date: payload.date,
-        time: payload.time,
-        location: payload.location,
-        bannerImage: payload.bannerImage || undefined,
-        interestedUserIds: [],
-        interestedCount: 0,
-        createdBy: currentUser.id,
-      };
-      get().addEvent(fallback);
-      return fallback;
+    const { data, error } = await supabase
+      .from('events')
+      .insert(eventToInsert)
+      .select('*')
+      .single();
+    if (error) {
+      console.error('createEvent error', error);
+      throw error;
     }
+
+    const normalized = normalizeEventRow(data);
+    set((state) => ({ events: [...state.events, normalized] }));
+    return normalized;
   },
 
   fetchEvents: async () => {
@@ -624,7 +747,7 @@ export const useStore = create<AppState>((set, get) => {
       myListings: state.myListings.map((i) => (i.id === itemId ? { ...i, ...updates } : i)),
     })),
 
-  createMarketplaceItem: async ({ title, description, price, imageUris = [] }: { title: string; description: string; price: number; imageUris?: string[] }) => {
+  createMarketplaceItem: async ({ title, description, price, imageUris = [], sellerPhone }: { title: string; description: string; price: number; imageUris?: string[]; sellerPhone: string }) => {
     const currentUser = get().currentUser;
     if (!currentUser) {
       throw new Error('Not authenticated');
@@ -649,47 +772,100 @@ export const useStore = create<AppState>((set, get) => {
       images: imageSources,
       seller_id: currentUser.id,
       seller_name: currentUser.name,
+      seller_phone: sellerPhone,
       seller_major: currentUser.major,
       seller_year: currentUser.year,
+      seller_college_name: currentUser.collegeName || '',
       seller_rating: currentUser.rating || 0,
+      college_id: currentUser.collegeId || null,
+      college_name: currentUser.collegeName || null,
       status: 'active',
     };
 
-    try {
-      const { data, error } = await supabase
-        .from('marketplace_items')
-        .insert(payload)
-        .select('*')
-        .single();
-      if (error) throw error;
-      const normalized = normalizeMarketplaceRow(data);
-      set((state) => ({
-        marketplaceItems: [normalized, ...state.marketplaceItems],
-        myListings: normalized.sellerId === currentUser.id ? [normalized, ...state.myListings] : state.myListings,
-      }));
-      return normalized;
-    } catch (err) {
-      console.error('createMarketplaceItem error', err);
-      const fallback: MarketplaceItem = {
-        id: `local_market_${Date.now()}`,
-        title,
-        description,
-        price,
-        images: imageSources,
-        sellerId: currentUser.id,
-        sellerName: currentUser.name,
-        sellerMajor: currentUser.major,
-        sellerYear: currentUser.year,
-        sellerRating: currentUser.rating || 0,
-        status: 'active',
-        createdAt: new Date(),
-      };
-      set((state) => ({
-        marketplaceItems: [fallback, ...state.marketplaceItems],
-        myListings: [fallback, ...state.myListings],
-      }));
-      return fallback;
+    const api = await import('../lib/api');
+    if (api.isBackendConfigured()) {
+      try {
+        const res = await api.post('/marketplace', payload);
+        const created = (res as any).data || res;
+        const normalized = normalizeMarketplaceRow(created);
+        set((state) => ({
+          marketplaceItems: [normalized, ...state.marketplaceItems],
+          myListings: normalized.sellerId === currentUser.id ? [normalized, ...state.myListings] : state.myListings,
+        }));
+        return normalized;
+      } catch (error) {
+        console.error('createMarketplaceItem backend error', error);
+        throw error;
+      }
     }
+
+    const { data, error } = await supabase
+      .from('marketplace_items')
+      .insert(payload)
+      .select('*')
+      .single();
+    if (error) {
+      console.error('createMarketplaceItem error', error);
+      throw error;
+    }
+    const normalized = normalizeMarketplaceRow(data);
+    set((state) => ({
+      marketplaceItems: [normalized, ...state.marketplaceItems],
+      myListings: normalized.sellerId === currentUser.id ? [normalized, ...state.myListings] : state.myListings,
+    }));
+    return normalized;
+  },
+
+  closeMarketplaceItem: async (itemId) => {
+    const currentUser = get().currentUser;
+    if (!currentUser) throw new Error('Not authenticated');
+    const api = await import('../lib/api');
+
+    if (api.isBackendConfigured()) {
+      const res = await api.patch(`/marketplace/${itemId}/status`, { status: 'sold' });
+      const updated = normalizeMarketplaceRow((res as any).data || res);
+      set((state) => ({
+        marketplaceItems: state.marketplaceItems.map((item) => (item.id === updated.id ? updated : item)),
+        myListings: state.myListings.map((item) => (item.id === updated.id ? updated : item)),
+      }));
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('marketplace_items')
+      .update({ status: 'sold' })
+      .eq('id', itemId)
+      .eq('seller_id', currentUser.id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    const updated = normalizeMarketplaceRow(data);
+    set((state) => ({
+      marketplaceItems: state.marketplaceItems.map((item) => (item.id === updated.id ? updated : item)),
+      myListings: state.myListings.map((item) => (item.id === updated.id ? updated : item)),
+    }));
+  },
+
+  deleteMarketplaceItem: async (itemId) => {
+    const currentUser = get().currentUser;
+    if (!currentUser) throw new Error('Not authenticated');
+    const api = await import('../lib/api');
+
+    if (api.isBackendConfigured()) {
+      await api.del(`/marketplace/${itemId}`);
+    } else {
+      const { error } = await supabase
+        .from('marketplace_items')
+        .delete()
+        .eq('id', itemId)
+        .eq('seller_id', currentUser.id);
+      if (error) throw error;
+    }
+
+    set((state) => ({
+      marketplaceItems: state.marketplaceItems.filter((item) => item.id !== itemId),
+      myListings: state.myListings.filter((item) => item.id !== itemId),
+    }));
   },
 
   subscribeToMarketplace: () => {
@@ -830,9 +1006,20 @@ export const useStore = create<AppState>((set, get) => {
       // Only subscribe to DB-backed chats (UUIDs) — skip local-only chat ids like "chat_..."
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(chatId)) return;
+      const pausedUntil = _realtimePausedUntil.get(chatId) || 0;
+      if (pausedUntil > Date.now()) return;
+      _activeRealtimeChatIds.add(chatId);
       if (_realtimeSubscriptions.has(chatId)) return; // already subscribed
 
       const channelName = `messages:chat:${chatId}`;
+      const pendingRetry = _realtimeRetryTimers.get(chatId);
+      if (pendingRetry) {
+        clearTimeout(pendingRetry);
+        _realtimeRetryTimers.delete(chatId);
+      }
+      if (!_realtimeRetryCounts.has(chatId)) {
+        _realtimeRetryCounts.set(chatId, 0);
+      }
 
       const channel = supabase
         .channel(channelName)
@@ -843,38 +1030,90 @@ export const useStore = create<AppState>((set, get) => {
             try {
               const m = payload.new;
               if (!m) return;
-              console.log('[REALTIME-MSG] Incoming message:', m.id, 'for chat:', chatId);
               const normalized = {
                 id: m.id,
                 chatId: m.chat_id || chatId,
                 senderId: m.sender_id || m.senderId,
                 senderName: m.sender_name || m.senderName,
-                text: m.text,
+                text: m.text || '',
                 timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
                 attachments: m.attachments || null,
                 status: 'sent', // messages from DB are already sent
               } as Message;
               // Add message to store (also updates chat.lastMessageTime)
               get().addMessage(chatId, normalized);
-              console.log('[REALTIME-MSG] ✓ Message added to state, UI should re-render now');
             } catch (e) {
               console.warn('[REALTIME-MSG] ERROR handling message:', e);
             }
           }
         )
         .subscribe((status: any) => {
-          console.log('[REALTIME-SUB]', channelName, '→ Status:', status);
           if (status === 'SUBSCRIBED') {
+            console.log('[REALTIME-SUB]', channelName, '→ Status:', status);
+          }
+          if (status === 'SUBSCRIBED') {
+            const retry = _realtimeRetryTimers.get(chatId);
+            if (retry) {
+              clearTimeout(retry);
+              _realtimeRetryTimers.delete(chatId);
+            }
+            _realtimeRetryCounts.set(chatId, 0);
+            _realtimeLastClosedWarnAt.delete(chatId);
+            _realtimeClosedCountWindow.delete(chatId);
             console.log('[REALTIME-SUB] ✓ Ready to receive messages for:', chatId);
-          } else if (status === 'CLOSED') {
-            console.warn('[REALTIME-SUB] ⚠ Channel closed for', chatId, '- attempting to reconnect');
-            // Try to reconnect after a delay
-            setTimeout(() => {
-              if (_realtimeSubscriptions.has(chatId)) {
-                console.log('[REALTIME-SUB] Retrying subscription for', chatId);
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            const now = Date.now();
+            const currentWindow = _realtimeClosedCountWindow.get(chatId);
+            if (!currentWindow || now - currentWindow.windowStartMs > 15000) {
+              _realtimeClosedCountWindow.set(chatId, { count: 1, windowStartMs: now });
+            } else {
+              currentWindow.count += 1;
+              _realtimeClosedCountWindow.set(chatId, currentWindow);
+            }
+            const updatedWindow = _realtimeClosedCountWindow.get(chatId);
+            if (updatedWindow && updatedWindow.count >= 4) {
+              _realtimePausedUntil.set(chatId, now + 60000);
+              _activeRealtimeChatIds.delete(chatId);
+            }
+            const lastWarn = _realtimeLastClosedWarnAt.get(chatId) || 0;
+            if (now - lastWarn > 5000) {
+              console.warn('[REALTIME-SUB] ⚠ Channel closed/error for', chatId, '- attempting to reconnect');
+              _realtimeLastClosedWarnAt.set(chatId, now);
+            }
+            const registered = _realtimeSubscriptions.get(chatId);
+            if (registered) {
+              try {
+                // @ts-ignore
+                if (supabase.removeChannel) supabase.removeChannel(registered);
+              } catch (e) {
+                // ignore
+              }
+              try {
+                registered.unsubscribe?.();
+              } catch (e) {
+                // ignore
+              }
+              _realtimeSubscriptions.delete(chatId);
+            }
+            if (!_activeRealtimeChatIds.has(chatId)) return;
+            if (_realtimeRetryTimers.has(chatId)) return;
+            const attempt = (_realtimeRetryCounts.get(chatId) || 0) + 1;
+            _realtimeRetryCounts.set(chatId, attempt);
+            if (attempt > 8) {
+              console.warn('[REALTIME-SUB] Max reconnect attempts reached for', chatId, '- realtime paused');
+              _realtimePausedUntil.set(chatId, Date.now() + 60000);
+              _activeRealtimeChatIds.delete(chatId);
+              return;
+            }
+            const retryDelayMs = Math.min(30000, Math.pow(2, attempt) * 1000);
+            const retryTimer = setTimeout(() => {
+              _realtimeRetryTimers.delete(chatId);
+              if (_activeRealtimeChatIds.has(chatId) && !_realtimeSubscriptions.has(chatId)) {
+                console.log('[REALTIME-SUB] Retrying subscription for', chatId, `(attempt ${attempt})`);
                 get().subscribeToChatMessages(chatId);
               }
-            }, 2000);
+            }, retryDelayMs);
+            _realtimeRetryTimers.set(chatId, retryTimer);
           }
         });
 
@@ -888,6 +1127,16 @@ export const useStore = create<AppState>((set, get) => {
 
   unsubscribeFromChatMessages: (chatId: string) => {
     try {
+      _activeRealtimeChatIds.delete(chatId);
+      const retry = _realtimeRetryTimers.get(chatId);
+      if (retry) {
+        clearTimeout(retry);
+        _realtimeRetryTimers.delete(chatId);
+      }
+      _realtimeRetryCounts.delete(chatId);
+      _realtimeLastClosedWarnAt.delete(chatId);
+      _realtimeClosedCountWindow.delete(chatId);
+      _realtimePausedUntil.delete(chatId);
       const channel = _realtimeSubscriptions.get(chatId);
       if (!channel) return;
       // supabase-js v2 exposes removeChannel; also attempt unsubscribe
@@ -910,6 +1159,13 @@ export const useStore = create<AppState>((set, get) => {
 
   unsubscribeAllRealtime: () => {
     try {
+      Array.from(_realtimeRetryTimers.values()).forEach((timer) => clearTimeout(timer));
+      _realtimeRetryTimers.clear();
+      _realtimeRetryCounts.clear();
+      _realtimeLastClosedWarnAt.clear();
+      _realtimeClosedCountWindow.clear();
+      _realtimePausedUntil.clear();
+      _activeRealtimeChatIds.clear();
       Array.from(_realtimeSubscriptions.keys()).forEach((chatId) => {
         try {
           const channel = _realtimeSubscriptions.get(chatId);
@@ -947,11 +1203,45 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
 
-  updateChat: (chatId, updates) =>
-    set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, ...updates } : c)) })),
+  updateChat: (chatId, updates) => {
+    set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, ...updates } : c)) }));
+
+    const dbUpdates: Record<string, any> = {};
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.participantIds !== undefined) dbUpdates.participant_ids = updates.participantIds;
+    if (updates.avatarEmoji !== undefined) dbUpdates.avatar_emoji = updates.avatarEmoji;
+    if (updates.avatarImage !== undefined) dbUpdates.avatar_image = updates.avatarImage;
+    if (updates.clubId !== undefined) dbUpdates.club_id = updates.clubId;
+    if (updates.marketplaceItemId !== undefined) dbUpdates.marketplace_item_id = updates.marketplaceItemId;
+    if (updates.unreadCount !== undefined) dbUpdates.unread_count = updates.unreadCount;
+    if (updates.lastMessageTime !== undefined) dbUpdates.last_message_time = updates.lastMessageTime.toISOString();
+    if (updates.lastMessage !== undefined) {
+      dbUpdates.last_message = updates.lastMessage
+        ? {
+            id: updates.lastMessage.id,
+            chat_id: updates.lastMessage.chatId,
+            sender_id: updates.lastMessage.senderId,
+            sender_name: updates.lastMessage.senderName,
+            text: updates.lastMessage.text,
+            timestamp: updates.lastMessage.timestamp.toISOString(),
+          }
+        : null;
+    }
+
+    if (Object.keys(dbUpdates).length === 0) return;
+
+    (async () => {
+      try {
+        const { error } = await supabase.from('chats').update(dbUpdates).eq('id', chatId);
+        if (error) throw error;
+      } catch (err) {
+        console.warn('updateChat supabase update failed', err);
+      }
+    })();
+  },
 
   addMessage: (chatId, message) => {
-    console.log('[STORE] addMessage called for chat:', chatId, 'msg id:', message.id);
     return set((state) => {
       const newMessagesList = [...(state.messages[chatId] || []), message];
       const newChats = state.chats.map((c) =>
@@ -963,11 +1253,6 @@ export const useStore = create<AppState>((set, get) => {
             }
           : c
       );
-      console.log('[STORE] ✓ State updated:', {
-        chatId,
-        totalMsgs: newMessagesList.length,
-        lastMsg: message.text.substring(0, 30),
-      });
       return {
         messages: { ...state.messages, [chatId]: newMessagesList },
         chats: newChats,
@@ -1012,22 +1297,48 @@ export const useStore = create<AppState>((set, get) => {
           chatId: m.chat_id || m.chatId || chatId,
           senderId: m.sender_id || m.senderId,
           senderName: m.sender_name || m.senderName,
-          text: m.text,
+          text: m.text || '',
           timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
           attachments: m.attachments || m.attachments,
           status: 'sent', // messages fetched from DB are already sent
         })) || [];
-      set((state) => { 
+      const existing = get().messages[chatId] || [];
+      const serverIds = new Set((normalized as Message[]).map((m) => m.id));
+      const localPendingOrFailed = existing.filter(
+        (m) => (m.status === 'pending' || m.status === 'failed') && !serverIds.has(m.id)
+      );
+      const merged = [...(normalized as Message[]), ...localPendingOrFailed].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+      );
+
+      const sameLength = existing.length === merged.length;
+      const isSame =
+        sameLength &&
+        existing.every((m, idx) => {
+          const n = merged[idx];
+          return (
+            !!n &&
+            m.id === n.id &&
+            m.text === n.text &&
+            m.senderId === n.senderId &&
+            m.status === n.status &&
+            m.timestamp.getTime() === n.timestamp.getTime()
+          );
+        });
+
+      if (isSame) return;
+
+      if (__DEV__) {
         console.log('[FETCH-MESSAGES] Loaded', normalized.length, 'messages for chat', chatId);
-        return { messages: { ...state.messages, [chatId]: normalized as Message[] } };
-      });
+      }
+      set((state) => ({ messages: { ...state.messages, [chatId]: merged } }));
     } catch (err) {
       console.error('fetchMessagesForChat error', err);
     }
   },
 
   // Optimistic send with retry/backoff
-  sendMessage: async (chatId, text) => {
+  sendMessage: async (chatId, text, attachments = []) => {
     const MAX_RETRIES = 4;
     const currentUser = get().currentUser;
     if (!currentUser) throw new Error('Not authenticated');
@@ -1041,6 +1352,7 @@ export const useStore = create<AppState>((set, get) => {
       senderName: currentUser.name,
       text,
       timestamp: new Date(),
+      attachments: attachments.length ? attachments : undefined,
       status: 'pending',
     };
 
@@ -1051,7 +1363,7 @@ export const useStore = create<AppState>((set, get) => {
       try {
   const api = await import('../lib/api');
   // Use smart poster which falls back to direct Supabase insert when backend not configured
-  const res = await api.postMessageSmart(chatId, text);
+  const res = await api.postMessageSmart(chatId, text, attachments);
         // server returns { data: created }
         const created = (res as any).data || res;
         const createdMsg: Message = {
@@ -1059,7 +1371,7 @@ export const useStore = create<AppState>((set, get) => {
           chatId: created.chat_id || created.chatId || chatId,
           senderId: created.sender_id || created.senderId || currentUser.id,
           senderName: created.sender_name || created.senderName || currentUser.name,
-          text: created.text,
+          text: created.text || '',
           timestamp: created.timestamp ? new Date(created.timestamp) : new Date(),
           attachments: created.attachments || undefined,
           status: 'sent',

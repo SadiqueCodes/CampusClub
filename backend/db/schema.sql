@@ -11,6 +11,7 @@ alter table if exists public.events add column if not exists college_name text;
 alter table if exists public.marketplace_items add column if not exists college_id text;
 alter table if exists public.marketplace_items add column if not exists college_name text;
 alter table if exists public.marketplace_items add column if not exists seller_college_name text;
+alter table if exists public.marketplace_items add column if not exists seller_phone text;
 alter table if exists public.profiles add column if not exists semester text;
 
 -- Colleges
@@ -218,6 +219,7 @@ create table if not exists public.marketplace_items (
   images text[] default '{}'::text[],
   seller_id uuid references public.profiles(id),
   seller_name text,
+  seller_phone text,
   seller_major text,
   seller_year text,
   seller_college_name text,

@@ -28,11 +28,11 @@ router.post('/', requireAuth, async (req, res) => {
 
     const createdBy = (req as any).user?.id || payload.created_by || null;
     
-    // Fetch creator's college info
-    let collegeId = null;
-    let collegeName = null;
+    // Use provided college info when available to avoid extra DB round-trip.
+    let collegeId = payload.college_id || null;
+    let collegeName = payload.college_name || null;
     
-    if (createdBy) {
+    if ((!collegeId || !collegeName) && createdBy) {
       const { data: profileData } = await supabaseServer
         .from('profiles')
         .select('college_id, college_name')
@@ -56,6 +56,7 @@ router.post('/', requireAuth, async (req, res) => {
         date: payload.date,
         time: payload.time || null,
         location: payload.location || null,
+        banner_image: payload.banner_image || null,
         created_by: createdBy,
         created_at: new Date(),
       },

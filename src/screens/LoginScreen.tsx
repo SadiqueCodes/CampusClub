@@ -285,8 +285,8 @@ export const LoginScreen: React.FC = () => {
         return false;
       }
     } else if (step === 2) {
-      if (!collegeName.trim() || !major.trim() || !selectedYear || !selectedSemester) {
-        Alert.alert('Missing campus info', 'Add your college, major, year, and semester.');
+      if (!collegeName.trim() || !collegeId || !major.trim() || !selectedYear || !selectedSemester) {
+        Alert.alert('Missing campus info', 'Select your college, major, year, and semester.');
         return false;
       }
     }
@@ -325,7 +325,7 @@ export const LoginScreen: React.FC = () => {
         email,
         password,
         collegeId: collegeId || '',
-        collegeName: collegeName || 'My Campus',
+        collegeName: collegeName || '',
         major: major || 'Undeclared',
         year: (selectedYear as User['year']) || 'Freshman',
         semester: selectedSemester || '1',

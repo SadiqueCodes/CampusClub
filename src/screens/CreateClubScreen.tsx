@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +10,46 @@ import { useStore } from '../store';
 import supabase from '../lib/supabase';
 import api, { isBackendConfigured } from '../lib/api';
 import { Club, ClubType, User } from '../types';
+import { getMarketplaceBucketName } from '../lib/storage';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const toStringArray = (value: any): string[] => {
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((v) => String(v).trim()).filter(Boolean);
+    } catch {}
+    return trimmed
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const resolveProfilePhotoUrl = async (value: any): Promise<string | undefined> => {
+  const raw = String(value || '').trim();
+  if (!raw) return undefined;
+  if (/^(https?:\/\/|file:\/\/|content:\/\/|data:|blob:)/i.test(raw)) return raw;
+  if (raw.includes('/storage/v1/object/public/')) return raw;
+
+  const path = raw.replace(/^\/+/, '');
+  const bucket = getMarketplaceBucketName();
+
+  // Works for private buckets.
+  const { data: signedData, error: signedErr } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, 60 * 60);
+  if (!signedErr && signedData?.signedUrl) return signedData.signedUrl;
+
+  // Fallback for public buckets.
+  const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+  return publicData?.publicUrl || undefined;
+};
 
 export const CreateClubScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -24,10 +62,13 @@ export const CreateClubScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [showInterestMenu, setShowInterestMenu] = useState(false);
+  const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [filterMenuCoords, setFilterMenuCoords] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const filterButtonRef = useRef<any>(null);
+  const createClubInFlightRef = useRef(false);
 
   const currentUser = useStore((state) => state.currentUser);
+  const updateProfile = useStore((state) => state.updateProfile);
   const addClub = useStore((state) => state.addClub);
   const addChat = useStore((state) => state.addChat);
   const chats = useStore((state) => state.chats);
@@ -37,7 +78,9 @@ export const CreateClubScreen: React.FC = () => {
 
   const myClubs = useMemo(() => {
     if (!currentUser?.id) return [];
-    return clubs.filter((club) => (club.memberIds || []).includes(currentUser.id));
+    return clubs.filter(
+      (club) => (club.memberIds || []).includes(currentUser.id) || club.leaderId === currentUser.id
+    );
   }, [clubs, currentUser?.id]);
   const [activeClubId, setActiveClubId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
@@ -60,7 +103,7 @@ export const CreateClubScreen: React.FC = () => {
             .neq('id', currentUser.id)
             .order('name', { ascending: true });
           if (error) throw error;
-          const list = (data || []).map((p: any) => ({
+          const list = await Promise.all((data || []).map(async (p: any) => ({
             id: p.id,
             name: p.name || 'Student',
             email: p.email || '',
@@ -69,14 +112,16 @@ export const CreateClubScreen: React.FC = () => {
             major: p.major || '',
             year: p.year || 'Freshman',
             semester: p.semester || '',
-            profilePhoto: p.profile_photo || undefined,
-            interests: p.interests || [],
-            clubsJoined: p.clubs_joined || [],
-            clubsLeading: p.clubs_leading || [],
+            profilePhoto: await resolveProfilePhotoUrl(
+              p.profile_photo || p.profilePhoto || p.avatar_url || p.avatarUrl
+            ),
+            interests: toStringArray(p.interests ?? p.interest_tags ?? p.interest_list),
+            clubsJoined: toStringArray(p.clubs_joined ?? p.clubsJoined),
+            clubsLeading: toStringArray(p.clubs_leading ?? p.clubsLeading),
             eventsAttended: p.events_attended || 0,
             rating: p.rating || 0,
             totalTransactions: p.total_transactions || 0,
-          })) as User[];
+          })) as Promise<User>[]);
           setPotentialMembers(list);
         } catch (e) {
           console.warn('fetch same-college users (supabase fallback) error', e);
@@ -87,26 +132,33 @@ export const CreateClubScreen: React.FC = () => {
       try {
         // Fetch only users from the same college
         const response = await api.get('/users/same-college');
-        const data = response.data?.data;
+        const data = Array.isArray((response as any)?.data)
+          ? (response as any).data
+          : Array.isArray((response as any)?.data?.data)
+          ? (response as any).data.data
+          : [];
         
         if (data && Array.isArray(data)) {
           // Map response to User type
-          const list = data.map((p: any) => ({
+          const list = await Promise.all(data.map(async (p: any) => ({
             id: p.id,
-            name: p.name,
-            email: p.email,
+            name: p.name || 'Student',
+            email: p.email || '',
             collegeId: p.college_id || '',
             collegeName: p.college_name || '',
             major: p.major || '',
             year: p.year || 'Freshman',
             semester: p.semester || '',
-            interests: p.interests || [],
-            clubsJoined: p.clubs_joined || [],
-            clubsLeading: p.clubs_leading || [],
+            profilePhoto: await resolveProfilePhotoUrl(
+              p.profile_photo || p.profilePhoto || p.avatar_url || p.avatarUrl
+            ),
+            interests: toStringArray(p.interests ?? p.interest_tags ?? p.interest_list),
+            clubsJoined: toStringArray(p.clubs_joined ?? p.clubsJoined),
+            clubsLeading: toStringArray(p.clubs_leading ?? p.clubsLeading),
             eventsAttended: p.events_attended || 0,
             rating: p.rating || 0,
             totalTransactions: p.total_transactions || 0,
-          })) as User[];
+          })) as Promise<User>[]);
           setPotentialMembers(list);
           return;
         }
@@ -184,6 +236,10 @@ export const CreateClubScreen: React.FC = () => {
     if (!currentUser) return;
     if (!activeClub) {
       Alert.alert('Select a club', 'Choose a club first to send invites from the list of your clubs.');
+      return;
+    }
+    if ((activeClub.memberIds || []).includes(member.id)) {
+      setInviteFeedback(`${member.name} is already a member`);
       return;
     }
     if (invitedMemberIds.has(member.id)) {
@@ -359,21 +415,127 @@ export const CreateClubScreen: React.FC = () => {
     resetForm();
   };
 
-  const handleCreateClub = () => {
+  const handleCreateClub = async () => {
     if (!clubName || !clubDescription || !currentUser) return;
+    if (createClubInFlightRef.current) return;
 
-    if (!isBackendConfigured()) {
-      createLocalClub();
-      return;
-    }
+    createClubInFlightRef.current = true;
+    setIsCreatingClub(true);
 
-    (async () => {
+    try {
+      if (!isBackendConfigured()) {
+        await createLocalClub();
+        return;
+      }
+
       try {
-        const payload = { name: clubName, type: clubType, description: clubDescription };
+        let effectiveCollegeId = (currentUser.collegeId || '').trim();
+        let effectiveCollegeName = (currentUser.collegeName || '').trim();
+
+        // If we only have collegeId locally, hydrate a display name for better backend fallback.
+        if (effectiveCollegeId && !effectiveCollegeName) {
+          const { data: collegeById } = await supabase
+            .from('colleges')
+            .select('id, name')
+            .eq('id', effectiveCollegeId)
+            .limit(1)
+            .maybeSingle();
+          if (collegeById?.name) {
+            effectiveCollegeName = String((collegeById as any).name).trim();
+          }
+        }
+
+        // Source of truth fallback: pull latest profile from Supabase.
+        if (!effectiveCollegeId || !effectiveCollegeName) {
+          const { data: profileRow, error: profileErr } = await supabase
+            .from('profiles')
+            .select('college_id, college_name')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+          if (!profileErr && profileRow) {
+            effectiveCollegeId = ((profileRow as any).college_id || effectiveCollegeId || '').trim();
+            effectiveCollegeName = ((profileRow as any).college_name || effectiveCollegeName || '').trim();
+          }
+        }
+
+        // Last client-side fallback: read auth metadata directly.
+        if (!effectiveCollegeId || !effectiveCollegeName) {
+          const { data: authUserData } = await supabase.auth.getUser();
+          const meta = authUserData?.user?.user_metadata || {};
+          if (!effectiveCollegeId && meta.college_id) {
+            effectiveCollegeId = String(meta.college_id).trim();
+          }
+          if (!effectiveCollegeName && meta.college_name) {
+            effectiveCollegeName = String(meta.college_name).trim();
+          }
+        }
+
+        // Heal older/incomplete accounts that have college_name but missing college_id.
+        if (!effectiveCollegeId) {
+          if (!effectiveCollegeName) {
+            Alert.alert(
+              'College missing',
+              'Your account is missing college info. Please sign out and sign up again selecting your college.'
+            );
+            return;
+          }
+
+          let resolvedCollege: any = null;
+          const { data: exactResolvedCollege, error: resolveErr } = await supabase
+            .from('colleges')
+            .select('id, name')
+            .ilike('name', effectiveCollegeName)
+            .limit(1)
+            .maybeSingle();
+
+          if (!resolveErr && exactResolvedCollege?.id) {
+            resolvedCollege = exactResolvedCollege;
+          } else {
+            const { data: fuzzyResolvedCollege } = await supabase
+              .from('colleges')
+              .select('id, name')
+              .ilike('name', `%${effectiveCollegeName}%`)
+              .limit(1)
+              .maybeSingle();
+            if (fuzzyResolvedCollege?.id) {
+              resolvedCollege = fuzzyResolvedCollege;
+            }
+          }
+
+          if (resolvedCollege?.id) {
+            effectiveCollegeId = String((resolvedCollege as any).id);
+            effectiveCollegeName = String((resolvedCollege as any).name || effectiveCollegeName).trim();
+            try {
+              await updateProfile({
+                collegeId: effectiveCollegeId,
+                collegeName: effectiveCollegeName,
+              });
+            } catch (profileErr) {
+              console.warn('Failed to persist resolved college on profile', profileErr);
+            }
+          }
+        }
+
+        if (!effectiveCollegeId) {
+          Alert.alert(
+            'College missing',
+            'Could not resolve your college. Please sign out and create your account again using the college selector.'
+          );
+          return;
+        }
+
+        const payload = {
+          name: clubName,
+          type: clubType,
+          description: clubDescription,
+          college_id: effectiveCollegeId,
+          college_name: effectiveCollegeName,
+        };
         const created = await api.createClub(payload);
         const createdClub = (created as any).data || created;
 
         const chatPayload = {
+          type: 'group' as const,
           participant_ids: [currentUser.id],
           name: clubName,
           club_id: createdClub.id,
@@ -442,10 +604,21 @@ export const CreateClubScreen: React.FC = () => {
         setCurrentProfileIndex(0);
         resetForm();
       } catch (e) {
-        console.warn('Create club backend flow failed, falling back to local creation', e);
-        createLocalClub();
+        console.warn('Create club backend flow failed', e);
+        const message = e instanceof Error ? e.message : String(e || '');
+        if (message.includes('Missing college_id')) {
+          Alert.alert(
+            'College missing',
+            'Your account still has no linked college. Please open profile and set your college, then try creating the club again.'
+          );
+          return;
+        }
+        Alert.alert('Create club failed', 'Could not create the club right now. Please try again.');
       }
-    })();
+    } finally {
+      createClubInFlightRef.current = false;
+      setIsCreatingClub(false);
+    }
   };
 
   const resetForm = () => {
@@ -646,6 +819,7 @@ export const CreateClubScreen: React.FC = () => {
           clubDescription={clubDescription}
           setClubDescription={setClubDescription}
           clubTypes={clubTypes}
+          isSubmitting={isCreatingClub}
           onSubmit={handleCreateClub}
         />
       </View>
@@ -729,6 +903,7 @@ export const CreateClubScreen: React.FC = () => {
         clubDescription={clubDescription}
         setClubDescription={setClubDescription}
         clubTypes={clubTypes}
+        isSubmitting={isCreatingClub}
         onSubmit={handleCreateClub}
       />
     </View>
@@ -745,18 +920,28 @@ const CreateClubModal: React.FC<{
   clubDescription: string;
   setClubDescription: (val: string) => void;
   clubTypes: ClubType[];
-  onSubmit: () => void;
-}> = ({ visible, onClose, clubName, setClubName, clubType, setClubType, clubDescription, setClubDescription, clubTypes, onSubmit }) => {
+  isSubmitting: boolean;
+  onSubmit: () => void | Promise<void>;
+}> = ({ visible, onClose, clubName, setClubName, clubType, setClubType, clubDescription, setClubDescription, clubTypes, isSubmitting, onSubmit }) => {
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [customTypeName, setCustomTypeName] = useState('');
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay} />
+      </TouchableWithoutFeedback>
+      <View style={styles.modalRoot}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create New Club</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} disabled={isSubmitting}>
               <Ionicons name="close" size={28} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
@@ -830,12 +1015,21 @@ const CreateClubModal: React.FC<{
             </View>
 
             <TouchableOpacity
-              style={[styles.submitButton, (!clubName || !clubDescription) && styles.submitButtonDisabled]}
+              style={[styles.submitButton, (!clubName || !clubDescription || isSubmitting) && styles.submitButtonDisabled]}
               onPress={onSubmit}
-              disabled={!clubName || !clubDescription}
+              disabled={!clubName || !clubDescription || isSubmitting}
             >
-              <Text style={styles.submitButtonText}>Create & Invite Members</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.submitButtonText}>Creating...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.submitButtonText}>Create & Invite Members</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -1007,8 +1201,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  modalRoot: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
   },
   modalContent: {

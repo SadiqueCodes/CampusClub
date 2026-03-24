@@ -51,6 +51,7 @@ const EventsStackNavigator: React.FC = () => {
   return (
     <EventsStack.Navigator screenOptions={{ headerShown: false }}>
       <EventsStack.Screen name="EventsList" component={EventsScreen} />
+      <EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
       <EventsStack.Screen name="ManageEvent" component={ManageEventScreen} />
     </EventsStack.Navigator>
   );
@@ -148,6 +149,11 @@ export const TabNavigator: React.FC = () => {
       <Tab.Screen
         name="Clubs"
         component={ClubsStackNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('Clubs', { screen: 'CreateClub' });
+          },
+        })}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
@@ -181,6 +187,7 @@ const styles = StyleSheet.create({
     top: -20,
     alignItems: 'center',
     justifyContent: 'center',
+    pointerEvents: 'none',
   },
   centerTab: {
     width: 64,
@@ -195,5 +202,6 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 4,
     borderColor: '#FFFFFF',
+    pointerEvents: 'none',
   },
 });

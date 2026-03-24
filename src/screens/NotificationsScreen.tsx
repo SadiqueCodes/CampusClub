@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { JoinRequest } from '../types';
 import supabase from '../lib/supabase';
+import api, { isBackendConfigured } from '../lib/api';
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -17,6 +18,8 @@ export const NotificationsScreen: React.FC = () => {
   const updateChat = useStore((state) => state.updateChat);
   const addMemberToClub = useStore((state) => state.addMemberToClub);
   const fetchChats = useStore((state) => state.fetchChats);
+  const fetchClubs = useStore((state) => state.fetchClubs);
+  const fetchJoinRequests = useStore((state) => state.fetchJoinRequests);
   const myId = currentUser?.id || '';
 
   const myApplications = useMemo(
@@ -93,9 +96,18 @@ export const NotificationsScreen: React.FC = () => {
   };
 
   const handleApplicationDecision = async (request: JoinRequest, decision: 'accepted' | 'rejected') => {
+    if (isBackendConfigured()) {
+      try {
+        await api.respondJoinRequest(request.id, decision);
+        await Promise.all([fetchClubs(), fetchChats(), fetchJoinRequests()]);
+        return;
+      } catch (err) {
+        console.warn('Backend respondJoinRequest failed, falling back to local flow', err);
+      }
+    }
+
     if (decision === 'accepted') {
       await addUserToClub(request.clubId, request.userId);
-      // Refetch chats so the new member can see the group chat
       try {
         await fetchChats();
       } catch (err) {
@@ -109,6 +121,16 @@ export const NotificationsScreen: React.FC = () => {
     request: JoinRequest,
     decision: 'accepted' | 'rejected'
   ) => {
+    if (isBackendConfigured()) {
+      try {
+        await api.respondJoinRequest(request.id, decision);
+        await Promise.all([fetchClubs(), fetchChats(), fetchJoinRequests()]);
+        return;
+      } catch (err) {
+        console.warn('Backend respondJoinRequest failed, falling back to local flow', err);
+      }
+    }
+
     if (decision === 'accepted' && request.userId === myId) {
       await addUserToClub(request.clubId, request.userId);
       // Refetch chats so we can see the group chat
@@ -275,10 +297,10 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>My applications</Text>
           </View>
-          {myApplications.length === 0 ? (
+          {pendingApplications.length === 0 ? (
             renderEmptyState("You haven't requested to join any clubs yet.")
           ) : (
-            myApplications.map((request) => {
+            pendingApplications.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               return (
                 <View key={request.id} style={styles.card}>
@@ -313,10 +335,10 @@ export const NotificationsScreen: React.FC = () => {
             </View>
             <Text style={styles.sectionTitle}>Incoming requests (your clubs)</Text>
           </View>
-          {incomingRequests.length === 0 ? (
+          {pendingIncoming.length === 0 ? (
             renderEmptyState('No new join requests yet. Members will appear here.')
           ) : (
-            incomingRequests.map((request) => {
+            pendingIncoming.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               const initial = request.userName?.charAt(0).toUpperCase() || '?';
               return (

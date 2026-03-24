@@ -40,7 +40,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     }
 
     const insertRow = {
-      type: payload.type || 'direct',
+      type: payload.type || (payload.club_id ? 'group' : 'direct'),
       name: payload.name || null,
       participant_ids: payload.participant_ids,
       last_message: null,

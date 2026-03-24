@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Image,
   Dimensions,
   Alert,
+  Share,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,21 +22,38 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const EventDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const eventParam: Event = route.params?.event;
-  const { currentUser, toggleEventInterest, events } = useStore();
+  const eventParam: Event | undefined = route.params?.event;
+  const eventIdParam: string | undefined = route.params?.eventId;
+  const { currentUser, toggleEventInterest, events, fetchEvents } = useStore();
 
   // Get the latest event data from store
-  const event = events.find((e) => e.id === eventParam?.id) || eventParam;
+  const resolvedEventId = eventParam?.id || eventIdParam;
+  const event = events.find((e) => e.id === resolvedEventId) || eventParam;
+  const isCreator = !!(currentUser?.id && event?.createdBy === currentUser.id);
 
   const [isInterested, setIsInterested] = useState(
     event?.interestedUserIds?.includes(currentUser?.id || '') || false
   );
 
+  useEffect(() => {
+    if (!event && resolvedEventId) {
+      fetchEvents();
+    }
+  }, [event, resolvedEventId, fetchEvents]);
+
   if (!event) {
-    return null;
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator size="large" color="#E372A1" />
+      </View>
+    );
   }
 
   const handleInterested = () => {
+    if (isCreator) {
+      Alert.alert('Your event', 'You created this event.');
+      return;
+    }
     if (currentUser) {
       toggleEventInterest(event.id, currentUser.id);
       setIsInterested(!isInterested);
@@ -48,11 +67,40 @@ export const EventDetailScreen: React.FC = () => {
   };
 
   const handleRegister = () => {
+    if (isCreator) {
+      Alert.alert('Your event', 'You created this event.');
+      return;
+    }
     Alert.alert(
       'Registration Successful!',
       'You have been registered for this event. Check your email for confirmation.',
       [{ text: 'OK' }]
     );
+  };
+
+  const handleShareEvent = async () => {
+    try {
+      const dateLabel = event.date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      const lines = [
+        `Check out this event: ${event.title}`,
+        `Club: ${event.clubName}`,
+        `Date: ${dateLabel}`,
+        `Time: ${event.time}`,
+        `Location: ${event.location}`,
+      ];
+      if (event.bannerImage && /^https?:\/\//i.test(event.bannerImage)) {
+        lines.push(`Poster: ${event.bannerImage}`);
+      }
+      lines.push(`Open in CampusClub: campusclub://event/${event.id}`);
+      await Share.share({ message: lines.join('\n') });
+    } catch (err) {
+      Alert.alert('Share failed', 'Could not open share options right now.');
+    }
   };
 
   return (
@@ -69,7 +117,7 @@ export const EventDetailScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Details</Text>
-        <TouchableOpacity style={styles.shareButton}>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShareEvent}>
           <Ionicons name="share-outline" size={22} color="#fff" />
         </TouchableOpacity>
       </LinearGradient>
@@ -195,6 +243,12 @@ export const EventDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F8F9FA',
   },
   header: {
@@ -371,8 +425,10 @@ const styles = StyleSheet.create({
   },
   joinButton: {
     flex: 1,
+    minHeight: 52,
     borderRadius: 14,
     overflow: 'hidden',
+    backgroundColor: '#B06579',
     shadowColor: '#E372A1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -380,7 +436,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   joinButtonGradient: {
-    paddingVertical: 16,
+    flex: 1,
+    width: '100%',
+    borderRadius: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',

@@ -16,10 +16,12 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { clubs, events, marketplaceItems, currentUser, joinRequests } = useStore();
   const createMarketplaceItem = useStore((state) => state.createMarketplaceItem);
+  const createJoinRequest = useStore((state) => state.createJoinRequest);
   const [showListingModal, setShowListingModal] = useState(false);
   const [listingTitle, setListingTitle] = useState('');
   const [listingDescription, setListingDescription] = useState('');
   const [listingPrice, setListingPrice] = useState('');
+  const [listingPhone, setListingPhone] = useState('');
   const [isListingSaving, setIsListingSaving] = useState(false);
   const [listingImage, setListingImage] = useState<string | null>(null);
   const fetchInitialData = useStore((s) => s.fetchInitialData);
@@ -27,6 +29,7 @@ export const HomeScreen: React.FC = () => {
     Lobster_400Regular,
   });
   const myId = currentUser?.id || '';
+  const formatPrice = (value: number) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
   const myRequests = useMemo(
     () => joinRequests.filter((request) => request.userId === myId),
@@ -77,7 +80,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   const notificationCount =
-    pendingIncomingRequests.length + pendingMyRequests.length + invitationsForMe.length;
+    pendingIncomingRequests.length + invitationsForMe.length;
 
   // Fetch live data from Supabase (or backend) — re-run when currentUser changes
   useEffect(() => {
@@ -212,6 +215,35 @@ export const HomeScreen: React.FC = () => {
 
   const popularClubs = heroClubs();
 
+  const handleApplyToClub = async (club: Club) => {
+    if (!currentUser) {
+      Alert.alert('Sign in required', 'Please sign in to request joining a club.');
+      return;
+    }
+    if ((club.memberIds || []).includes(currentUser.id)) {
+      Alert.alert('Already joined', 'You are already a member of this club.');
+      return;
+    }
+    if (pendingRequestClubIds.has(club.id)) {
+      return;
+    }
+
+    try {
+      await createJoinRequest({
+        id: `request_${Date.now()}`,
+        clubId: club.id,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userPhoto: currentUser.profilePhoto,
+        initiatedBy: 'user',
+        status: 'pending',
+        createdAt: new Date(),
+      });
+    } catch (e) {
+      Alert.alert('Failed', 'Could not send join request right now.');
+    }
+  };
+
   const renderClubCard = ({ item }: { item: Club }) => {
     const [gradientStart, gradientEnd] = getClubGradient(item);
     const isMember = currentUser ? (item.memberIds || []).includes(currentUser.id) : false;
@@ -224,7 +256,7 @@ export const HomeScreen: React.FC = () => {
     }
 
     return (
-      <TouchableOpacity style={styles.clubCard} activeOpacity={0.98}>
+      <View style={styles.clubCard}>
         <LinearGradient
           colors={[gradientStart, gradientEnd]}
           style={styles.clubCardGradient}
@@ -232,7 +264,7 @@ export const HomeScreen: React.FC = () => {
           end={{ x: 1, y: 1 }}
         >
           {/* Pattern Overlay */}
-          <Svg width={280} height={160} style={styles.patternOverlay}>
+          <Svg width={280} height={160} style={styles.patternOverlay} pointerEvents="none">
             <Defs>
               <Pattern id={`dots-${item.id}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
                 <Circle cx="2" cy="2" r="1.5" fill="rgba(255,255,255,0.15)" />
@@ -263,18 +295,31 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
               <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
             </View>
-            <TouchableOpacity style={[styles.applyButton, (isMember || isPending) && styles.applyButtonDisabled]} disabled>
+            <TouchableOpacity
+              style={[styles.applyButton, (isMember || isPending) && styles.applyButtonDisabled]}
+              disabled={isMember || isPending}
+              onPress={() => handleApplyToClub(item)}
+            >
               <Text style={[styles.applyButtonText, (isMember || isPending) && styles.applyButtonTextMuted]}>
                 {ctaLabel}
               </Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
-      </TouchableOpacity>
+      </View>
     );
   };
 
   const isClubLeader = currentUser && clubs.some(c => c.leaderId === currentUser.id);
+  const homeEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
+    return sorted.slice(0, 4);
+  }, [events]);
+  const activeMarketplaceItems = useMemo(
+    () => marketplaceItems.filter((item) => item.status === 'active'),
+    [marketplaceItems]
+  );
+  const homeMarketplaceItems = useMemo(() => activeMarketplaceItems.slice(0, 3), [activeMarketplaceItems]);
 
   const handleCreateListing = async () => {
     if (!currentUser) {
@@ -290,6 +335,11 @@ export const HomeScreen: React.FC = () => {
       Alert.alert('Invalid price', 'Enter a valid positive price.');
       return;
     }
+    const phoneDigits = listingPhone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      Alert.alert('Invalid phone', 'Enter a valid 10-digit phone number.');
+      return;
+    }
     setIsListingSaving(true);
     try {
       await createMarketplaceItem({
@@ -297,6 +347,7 @@ export const HomeScreen: React.FC = () => {
         description: listingDescription.trim() || 'No description provided',
         price: parsedPrice,
         imageUris: listingImage ? [listingImage] : [],
+        sellerPhone: `+91${phoneDigits}`,
       });
       closeListingModal();
     } catch (err) {
@@ -312,12 +363,13 @@ export const HomeScreen: React.FC = () => {
     setListingTitle('');
     setListingDescription('');
     setListingPrice('');
+    setListingPhone('');
     setListingImage(null);
   };
 
   const handlePickListingImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.7,
     });
@@ -374,17 +426,24 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.eventsHeaderRow}>
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
-            {isClubLeader && (
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => navigation.navigate('AddEvent')}
-              >
-                <Ionicons name="add" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
+            <View style={styles.eventsActionsRow}>
+              {events.length > 4 && (
+                <TouchableOpacity onPress={() => navigation.navigate('Events')}>
+                  <Text style={styles.seeMoreText}>See More</Text>
+                </TouchableOpacity>
+              )}
+              {isClubLeader && (
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => navigation.navigate('AddEvent')}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          {events.length === 0 && isClubLeader ? (
+          {homeEvents.length === 0 && isClubLeader ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
               <Text style={styles.emptyStateText}>No events yet</Text>
@@ -392,7 +451,7 @@ export const HomeScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.eventsContainer}>
-              {events.map((item) => (
+              {homeEvents.map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.eventCard}
@@ -437,7 +496,7 @@ export const HomeScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.marketplaceGrid}>
-            {marketplaceItems.map((item) => (
+            {homeMarketplaceItems.map((item) => (
               <TouchableOpacity
                 key={item.id}
                 style={styles.marketplaceItem}
@@ -464,7 +523,7 @@ export const HomeScreen: React.FC = () => {
                   <Text style={styles.itemTitle} numberOfLines={1}>
                     {item.title}
                   </Text>
-                <Text style={styles.itemPrice}>{item.price}</Text>
+                <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
                   <Text style={styles.sellerName} numberOfLines={1}>
                     {item.sellerName}
                   </Text>
@@ -486,6 +545,8 @@ export const HomeScreen: React.FC = () => {
         visible={showListingModal}
         animationType="slide"
         transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
         onRequestClose={closeListingModal}
       >
         <View style={styles.modalOverlay}>
@@ -528,6 +589,13 @@ export const HomeScreen: React.FC = () => {
               value={listingPrice}
               onChangeText={setListingPrice}
               keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Seller phone (10 digits)"
+              value={listingPhone}
+              onChangeText={(value) => setListingPhone(value.replace(/[^\d]/g, '').slice(0, 10))}
+              keyboardType="phone-pad"
             />
             <TouchableOpacity
               style={[styles.modalButton, isListingSaving && { opacity: 0.7 }]}
@@ -632,6 +700,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  eventsActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   sectionTitle: {
     fontSize: 22,
@@ -959,14 +1032,15 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.62)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   modalContent: {
     width: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+    opacity: 1,
     borderRadius: 20,
     padding: 20,
   },

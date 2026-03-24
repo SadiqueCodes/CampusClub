@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+﻿import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -13,6 +13,8 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from '../types';
+import supabase from '../lib/supabase';
+import { getMarketplaceBucketName } from '../lib/storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -26,11 +28,13 @@ interface SwipeCardProps {
 export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipeRight }) => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const [imageFailed, setImageFailed] = useState(false);
 
   // Reset position when user changes
   useEffect(() => {
     translateX.value = 0;
     translateY.value = 0;
+    setImageFailed(false);
   }, [user.id]);
 
   const panGesture = Gesture.Pan()
@@ -78,6 +82,17 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
   });
 
   const topInterests = user.interests.slice(0, 3);
+  const yearShort =
+    user.year === 'Freshman' ? '1st' : user.year === 'Sophomore' ? '2nd' : user.year === 'Junior' ? '3rd' : '4th';
+  const resolvedProfilePhoto = (() => {
+    const raw = (user.profilePhoto || '').trim();
+    if (!raw) return '';
+    if (/^(https?:\/\/|file:\/\/|content:\/\/|data:|blob:)/i.test(raw)) return raw;
+    if (raw.includes('/storage/v1/object/public/')) return raw;
+    const bucket = getMarketplaceBucketName();
+    const { data } = supabase.storage.from(bucket).getPublicUrl(raw.replace(/^\/+/, ''));
+    return data?.publicUrl || '';
+  })();
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -89,7 +104,15 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
             style={styles.profilePhoto}
           >
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
+              {resolvedProfilePhoto && !imageFailed ? (
+                <Image
+                  source={{ uri: resolvedProfilePhoto }}
+                  style={styles.avatarImage}
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
+              )}
             </View>
           </LinearGradient>
 
@@ -110,7 +133,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
               <Text style={styles.name}>{user.name}</Text>
               <View style={styles.yearBadge}>
                 <Text style={styles.yearText}>
-                  {user.year === 'Freshman' ? '1st' : user.year === 'Sophomore' ? '2nd' : user.year === 'Junior' ? '3rd' : '4th'} Year
+                  {yearShort} Year - Sem {user.semester || '-'}
                 </Text>
               </View>
             </View>
@@ -120,30 +143,32 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
               <Text style={styles.major}>{user.major}</Text>
             </View>
 
-            <Text style={styles.bioText}>{user.collegeName}</Text>
-
-            {topInterests.length > 0 && (
-              <View style={styles.tagRow}>
-                {topInterests.map((interest) => (
+            <View style={styles.tagRow}>
+              {topInterests.length > 0 ? (
+                topInterests.map((interest) => (
                   <View key={interest} style={styles.tagChip}>
                     <Text style={styles.tagChipText}>{interest}</Text>
                   </View>
-                ))}
-              </View>
-            )}
+                ))
+              ) : (
+                <View style={styles.tagChip}>
+                  <Text style={styles.tagChipText}>No interests yet</Text>
+                </View>
+              )}
+            </View>
 
-            {user.clubsJoined.length > 0 && (
+            <View style={styles.statsBlock}>
               <View style={styles.statsRow}>
                 <View style={styles.statBubble}>
                   <Ionicons name="people" size={14} color="#fff" />
-                  <Text style={styles.statBubbleText}>{user.clubsJoined.length} clubs</Text>
-                </View>
-                <View style={styles.statBubble}>
-                  <Ionicons name="calendar" size={14} color="#fff" />
-                  <Text style={styles.statBubbleText}>{user.eventsAttended} events</Text>
+                  <Text style={styles.statBubbleText}>{(user.clubsJoined || []).length} clubs</Text>
                 </View>
               </View>
-            )}
+              <View style={[styles.statBubble, styles.eventStatBubble]}>
+                <Ionicons name="calendar" size={14} color="#fff" />
+                <Text style={styles.statBubbleText}>Events: {user.eventsAttended}</Text>
+              </View>
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -159,7 +184,7 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FAFC',
     borderRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -178,7 +203,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#fff',
+    backgroundColor: '#FCE7F3',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -186,6 +211,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 36,
@@ -251,6 +281,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#B06579',
   },
+  statsBlock: {
+    gap: 8,
+  },
   statsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -258,9 +291,11 @@ const styles = StyleSheet.create({
   statBubble: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#B06579',
-    borderRadius: 999,
+    borderRadius: 12,
+    width: '100%',
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
@@ -268,6 +303,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#fff',
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  eventStatBubble: {
+    alignSelf: 'stretch',
   },
   likeStamp: {
     position: 'absolute',
@@ -312,3 +351,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
+
+
+

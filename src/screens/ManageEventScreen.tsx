@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Image,
   Dimensions,
   Modal,
@@ -255,11 +256,16 @@ export const ManageEventScreen: React.FC = () => {
       {/* Edit Modal */}
       <Modal
         visible={showEditModal}
-        animationType="slide"
-        transparent={true}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <TouchableWithoutFeedback onPress={() => setShowEditModal(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.modalRoot}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Event</Text>
@@ -614,8 +620,11 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  modalRoot: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
   },
   modalContent: {

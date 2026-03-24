@@ -15,14 +15,18 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { Message } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { uploadImageToSupabase } from '../lib/storage';
+import supabase from '../lib/supabase';
+import api, { isBackendConfigured } from '../lib/api';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const EMPTY_MESSAGES: Message[] = [];
@@ -43,6 +47,8 @@ export const ChatDetailScreen: React.FC = () => {
     addMessage,
     updateChat,
     fetchMessagesForChat,
+    fetchChats,
+    fetchClubs,
     clubs,
     updateClub,
     events,
@@ -56,15 +62,23 @@ export const ChatDetailScreen: React.FC = () => {
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [showEventsModal, setShowEventsModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [attachMenuPosition, setAttachMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [viewerImageUri, setViewerImageUri] = useState<string | null>(null);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [pendingName, setPendingName] = useState('');
   const [pendingDescription, setPendingDescription] = useState('');
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const messageInputRef = useRef<TextInput>(null);
   const moreButtonRef = useRef<any>(null);
+  const attachButtonRef = useRef<any>(null);
 
   const chat = chats.find((c) => c.id === chatId);
   const club = chat?.clubId ? clubs.find((c) => c.id === chat.clubId) : undefined;
+  const isGroupChat = !!(chat && (chat.type === 'group' || chat.clubId));
   const members = useMemo(() => club?.memberIds || chat?.participantIds || [], [club, chat]);
   const clubEvents = useMemo(() => (club ? events.filter((event) => event.clubId === club.id) : []), [events, club?.id]);
   const isLeader = !!(club && currentUser && club.leaderId === currentUser.id);
@@ -75,12 +89,31 @@ export const ChatDetailScreen: React.FC = () => {
     }
   }, [chat]);
 
-  // Log when messages change to verify realtime updates are working
   useEffect(() => {
-    console.log('[CHAT-MESSAGES] Updated:', messages.length, 'messages');
+    if (!isGroupChat || members.length === 0) {
+      setMemberNames({});
+      return;
+    }
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', members as string[]);
+        if (error) throw error;
+        const next: Record<string, string> = {};
+        (data || []).forEach((row: any) => {
+          if (row?.id) next[row.id] = row.name || '';
+        });
+        setMemberNames(next);
+      } catch (e) {
+        console.warn('member name lookup failed', e);
+      }
+    })();
+  }, [isGroupChat, members]);
+
+  useEffect(() => {
     if (messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      console.log('[CHAT-MESSAGES] Latest:', lastMsg.senderName, '→', lastMsg.text.substring(0, 40));
       // Scroll to bottom when new messages arrive
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -89,31 +122,53 @@ export const ChatDetailScreen: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    // Load messages for this chat from backend
-    if (currentUser && chat) {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!currentUser?.id) return () => {};
+
       console.log('[CHAT] Loading messages for chat:', chatId);
       fetchMessagesForChat(chatId);
-    }
+      fetchChats();
+      fetchClubs();
 
-    // Subscribe to realtime messages for this chat while screen is active
-    if (chat) {
       try {
         console.log('[CHAT] Setting up realtime subscription for chat:', chatId);
         useStore.getState().subscribeToChatMessages(chatId);
       } catch (e) {
         console.warn('[CHAT] subscribeToChatMessages failed', e);
       }
-    }
 
-    return () => {
-      try {
-        console.log('[CHAT] Cleaning up realtime subscription for chat:', chatId);
-        useStore.getState().unsubscribeFromChatMessages(chatId);
-      } catch (e) {
-        // ignore
-      }
-    };
-  }, [chatId, currentUser, chat]);
+      // Fallback sync while focused.
+      // Messages poll faster; heavier chat/club metadata polls less often.
+      let tick = 0;
+      const interval = setInterval(() => {
+        fetchMessagesForChat(chatId);
+        tick += 1;
+        if (tick % 3 === 0) {
+          fetchChats();
+          fetchClubs();
+        }
+      }, 800);
+
+      return () => {
+        clearInterval(interval);
+        try {
+          console.log('[CHAT] Cleaning up realtime subscription for chat:', chatId);
+          useStore.getState().unsubscribeFromChatMessages(chatId);
+        } catch (e) {
+          // ignore
+        }
+      };
+    }, [chatId, currentUser?.id, fetchMessagesForChat, fetchChats, fetchClubs])
+  );
 
   if (!chat) {
     return (
@@ -128,10 +183,16 @@ export const ChatDetailScreen: React.FC = () => {
 
     const bodyText = messageText.trim();
     setMessageText('');
+    // Keyboard-first behavior: if user pastes a media URL, send it as attachment bubble.
+    const mediaUrlMatch = bodyText.match(/^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i);
     // Use store's optimistic sender which will add a pending message and handle retries
     (async () => {
       try {
-        await sendMessage(chatId, bodyText);
+        if (mediaUrlMatch) {
+          await sendMessage(chatId, '', [bodyText]);
+        } else {
+          await sendMessage(chatId, bodyText);
+        }
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -141,6 +202,54 @@ export const ChatDetailScreen: React.FC = () => {
       }
     })();
   };
+
+  const sendMediaAttachment = async (uri: string) => {
+    if (!currentUser) return;
+    try {
+      const uploadedUrl = await uploadImageToSupabase(uri, `chat-media/${chatId}/${currentUser.id}`);
+      await sendMessage(chatId, '', [uploadedUrl]);
+      setShowAttachMenu(false);
+      setAttachMenuPosition(null);
+    } catch (e) {
+      console.warn('media upload/send failed', e);
+      Alert.alert('Send failed', 'Could not send media right now. Please try again.');
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Allow photo access to send images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!result.canceled && result.assets?.length) {
+      await sendMediaAttachment(result.assets[0].uri);
+    }
+  };
+
+  const handlePickFromCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Allow camera access to take a photo.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!result.canceled && result.assets?.length) {
+      await sendMediaAttachment(result.assets[0].uri);
+    }
+  };
+
+  const isImageUrl = (value: string) => /\.(png|jpe?g|gif|webp)$/i.test(value.split('?')[0] || '');
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwnMessage = item.senderId === currentUser?.id;
@@ -158,9 +267,27 @@ export const ChatDetailScreen: React.FC = () => {
       <View style={[styles.messageContainer, isOwnMessage ? styles.ownMessage : styles.otherMessage]}>
         <View style={[styles.messageBubble, isOwnMessage ? styles.ownBubble : styles.otherBubble]}>
           {!isOwnMessage && <Text style={styles.senderName}>{item.senderName}</Text>}
-          <Text style={[styles.messageText, isOwnMessage ? styles.ownMessageText : styles.otherMessageText]}>
-            {item.text}
-          </Text>
+          {!!item.attachments?.length && (
+            <View style={styles.attachmentGrid}>
+              {item.attachments.map((uri, idx) => (
+                <TouchableOpacity key={`${item.id}_att_${idx}`} onPress={() => setViewerImageUri(uri)} activeOpacity={0.9}>
+                  {isImageUrl(uri) ? (
+                    <Image source={{ uri }} style={styles.messageAttachmentImage} />
+                  ) : (
+                    <View style={styles.messageAttachmentFallback}>
+                      <Ionicons name="document-attach" size={18} color="#111827" />
+                      <Text style={styles.messageAttachmentFallbackText}>Attachment</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {!!item.text && (
+            <Text style={[styles.messageText, isOwnMessage ? styles.ownMessageText : styles.otherMessageText]}>
+              {item.text}
+            </Text>
+          )}
           {isOwnMessage && item.status === 'failed' && (
             <TouchableOpacity 
               style={styles.failedAlertContainer}
@@ -185,19 +312,39 @@ export const ChatDetailScreen: React.FC = () => {
     setShowDescriptionModal(false);
     setShowEventsModal(false);
     setShowAvatarModal(false);
+    setShowAttachMenu(false);
     setMenuPosition(null);
+    setAttachMenuPosition(null);
   };
+
+  const handleOpenAttachMenu = () => {
+    if (!attachButtonRef.current) {
+      setShowAttachMenu(true);
+      if (isKeyboardVisible) {
+        setTimeout(() => messageInputRef.current?.focus(), 0);
+      }
+      return;
+    }
+    attachButtonRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
+      setAttachMenuPosition({ x, y, width, height });
+      setShowAttachMenu(true);
+      if (isKeyboardVisible) {
+        setTimeout(() => messageInputRef.current?.focus(), 0);
+      }
+    });
+  };
+
 
   const renderMemberName = (memberId: string) => {
     if (club?.leaderId === memberId) {
-      const leaderLabel = club.leaderName || 'Club Lead';
+      const leaderLabel = memberNames[memberId] || club.leaderName || 'Club Lead';
       const suffix = currentUser?.id === memberId ? ' (You • Lead)' : ' (Lead)';
       return `${leaderLabel}${suffix}`;
     }
     if (memberId === currentUser?.id && currentUser) {
       return `${currentUser.name} (You)`;
     }
-    return `Member ${memberId}`;
+    return memberNames[memberId] || 'Member';
   };
 
   const updateChatParticipants = (updatedMembers: string[]) => {
@@ -220,13 +367,31 @@ export const ChatDetailScreen: React.FC = () => {
       Alert.alert('Transfer leadership', 'Assign a new leader before leaving the club.');
       return;
     }
-    const updatedMembers = club.memberIds.filter((id) => id !== currentUser.id);
-    updateClub(club.id, {
-      memberIds: updatedMembers,
-      memberCount: updatedMembers.length,
-    });
-    updateChatParticipants(updatedMembers);
-    navigation.goBack();
+    (async () => {
+      try {
+        if (isBackendConfigured()) {
+          await api.leaveClub(club.id);
+          await Promise.all([fetchClubs(), fetchChats()]);
+          navigation.goBack();
+          return;
+        }
+
+        const updatedMembers = club.memberIds.filter((id) => id !== currentUser.id);
+        updateClub(club.id, {
+          memberIds: updatedMembers,
+          memberCount: updatedMembers.length,
+        });
+        updateChatParticipants(updatedMembers);
+        navigation.goBack();
+      } catch (e: any) {
+        const msg = e instanceof Error ? e.message : String(e || '');
+        if (msg.includes('transfer leadership')) {
+          Alert.alert('Transfer leadership', 'Assign a new leader before leaving the club.');
+          return;
+        }
+        Alert.alert('Exit failed', 'Could not leave this club right now. Please try again.');
+      }
+    })();
   };
 
   const handleRenameClub = () => {
@@ -253,6 +418,7 @@ export const ChatDetailScreen: React.FC = () => {
   };
 
   const handleUploadAvatar = async () => {
+    if (!currentUser) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Allow photo access to upload a group image.');
@@ -266,9 +432,15 @@ export const ChatDetailScreen: React.FC = () => {
     });
     if (!result.canceled && result.assets?.length) {
       const uri = result.assets[0].uri;
-      updateChat(chat.id, { avatarImage: uri, avatarEmoji: undefined });
-      if (club) {
-        updateClub(club.id, { logo: uri, logoEmoji: undefined });
+      try {
+        const publicUrl = await uploadImageToSupabase(uri, `club-avatars/${chat.id}/${currentUser.id}`);
+        updateChat(chat.id, { avatarImage: publicUrl, avatarEmoji: undefined });
+        if (club) {
+          updateClub(club.id, { logo: publicUrl, logoEmoji: undefined });
+        }
+      } catch (e) {
+        console.warn('Group avatar upload failed', e);
+        Alert.alert('Upload failed', 'Could not upload image right now. Please try again.');
       }
     }
     setShowAvatarModal(false);
@@ -277,7 +449,7 @@ export const ChatDetailScreen: React.FC = () => {
   const actionItems = [
     {
       label: 'View description',
-      visible: chat.type === 'group',
+      visible: isGroupChat,
       onPress: () => {
         setShowActions(false);
         setPendingDescription(club?.description || '');
@@ -287,7 +459,7 @@ export const ChatDetailScreen: React.FC = () => {
     },
     {
       label: 'View members',
-      visible: chat.type === 'group',
+      visible: isGroupChat,
       onPress: () => {
         setShowActions(false);
         setShowMembersModal(true);
@@ -295,7 +467,7 @@ export const ChatDetailScreen: React.FC = () => {
     },
     {
       label: 'Change club name',
-      visible: chat.type === 'group' && isLeader,
+      visible: isGroupChat && isLeader,
       onPress: () => {
         setShowActions(false);
         setShowRenameModal(true);
@@ -303,7 +475,7 @@ export const ChatDetailScreen: React.FC = () => {
     },
     {
       label: 'Club events',
-      visible: chat.type === 'group',
+      visible: isGroupChat,
       onPress: () => {
         setShowActions(false);
         setShowEventsModal(true);
@@ -311,7 +483,7 @@ export const ChatDetailScreen: React.FC = () => {
     },
     {
       label: 'Exit club',
-      visible: chat.type === 'group' && !!currentUser,
+      visible: isGroupChat && !!currentUser,
       onPress: () => {
         setShowActions(false);
         handleExitClub();
@@ -352,9 +524,9 @@ export const ChatDetailScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{chat.type === 'group' ? chat.name : 'Direct Chat'}</Text>
+            <Text style={styles.headerTitle}>{isGroupChat ? chat.name : 'Direct Chat'}</Text>
             <Text style={styles.headerSubtitle}>
-              {chat.type === 'group' ? `${chat.participantIds.length} members` : 'Active now'}
+              {isGroupChat ? `${members.length} members` : 'Active now'}
             </Text>
           </View>
           <TouchableOpacity
@@ -393,10 +565,11 @@ export const ChatDetailScreen: React.FC = () => {
           { paddingBottom: 8 + (insets.bottom > 0 ? insets.bottom - 6 : 0) },
         ]}
       >
-        <TouchableOpacity style={styles.attachButton}>
+        <TouchableOpacity ref={attachButtonRef} style={styles.attachButton} onPress={handleOpenAttachMenu}>
           <Ionicons name="add-circle" size={22} color="#B06579" />
         </TouchableOpacity>
         <TextInput
+          ref={messageInputRef}
           style={styles.input}
           placeholder="Message"
           placeholderTextColor="#9CA3AF"
@@ -414,7 +587,7 @@ export const ChatDetailScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={showActions} transparent animationType="fade">
+      <Modal visible={showActions} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback
           onPress={() => {
             setShowActions(false);
@@ -451,7 +624,46 @@ export const ChatDetailScreen: React.FC = () => {
         )}
       </Modal>
 
-      <Modal visible={showMembersModal} transparent animationType="fade">
+      {showAttachMenu && (
+        <>
+          <TouchableWithoutFeedback onPress={() => { setShowAttachMenu(false); setAttachMenuPosition(null); }}>
+            <View style={styles.clearOverlay} />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.attachSheet,
+              attachMenuPosition
+                ? {
+                    top: Math.max(8, attachMenuPosition.y - 80),
+                    left: Math.min(
+                      Math.max(attachMenuPosition.x + attachMenuPosition.width - 154, 12),
+                      SCREEN_WIDTH - 154 - 12
+                    ),
+                  }
+                : { bottom: 24, left: 16 },
+            ]}
+          >
+            <TouchableOpacity style={styles.attachOption} onPress={handlePickFromCamera}>
+              <Ionicons name="camera" size={18} color="#B06579" />
+              <Text style={styles.attachOptionText}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachOption} onPress={handlePickFromGallery}>
+              <Ionicons name="image" size={18} color="#B06579" />
+              <Text style={styles.attachOptionText}>Gallery</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      <Modal visible={!!viewerImageUri} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
+        <TouchableWithoutFeedback onPress={() => setViewerImageUri(null)}>
+          <View style={styles.fullImageBackdrop}>
+            {viewerImageUri && <Image source={{ uri: viewerImageUri }} style={styles.fullImageView} resizeMode="contain" />}
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal visible={showMembersModal} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback onPress={closeAllModals}>
           <View style={styles.modalOverlay} />
         </TouchableWithoutFeedback>
@@ -487,7 +699,7 @@ export const ChatDetailScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <Modal visible={showRenameModal} transparent animationType="fade">
+      <Modal visible={showRenameModal} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback onPress={closeAllModals}>
           <View style={styles.modalOverlay} />
         </TouchableWithoutFeedback>
@@ -515,7 +727,7 @@ export const ChatDetailScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <Modal visible={showEventsModal} transparent animationType="fade">
+      <Modal visible={showEventsModal} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback onPress={closeAllModals}>
           <View style={styles.modalOverlay} />
         </TouchableWithoutFeedback>
@@ -539,7 +751,7 @@ export const ChatDetailScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <Modal visible={showDescriptionModal} transparent animationType="fade">
+      <Modal visible={showDescriptionModal} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback onPress={closeAllModals}>
           <View style={styles.modalOverlay} />
         </TouchableWithoutFeedback>
@@ -590,7 +802,7 @@ export const ChatDetailScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <Modal visible={showAvatarModal} transparent animationType="fade">
+      <Modal visible={showAvatarModal} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
         <TouchableWithoutFeedback onPress={closeAllModals}>
           <View style={styles.modalOverlay} />
         </TouchableWithoutFeedback>
@@ -716,8 +928,36 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   popoverOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  clearOverlay: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
+  },
+  attachmentGrid: {
+    gap: 8,
+    marginBottom: 6,
+  },
+  messageAttachmentImage: {
+    width: 180,
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  messageAttachmentFallback: {
+    width: 180,
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  messageAttachmentFallbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
   },
   messagesList: {
     padding: 16,
@@ -809,6 +1049,115 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  attachSheet: {
+    position: 'absolute',
+    width: 154,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  attachOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 7,
+  },
+  attachOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  mediaPickerModal: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: '24%',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  mediaGridImage: {
+    width: (SCREEN_WIDTH - 32 - 28 - 10) / 2,
+    height: 110,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  gifHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gifCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  gifSearchInput: {
+    marginTop: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  gifLoadingWrap: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  stickerCell: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  stickerCellText: {
+    fontSize: 28,
+  },
+  fullImageBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  fullImageView: {
+    width: '100%',
+    height: '100%',
+  },
   input: {
     flex: 1,
     maxHeight: 100,
@@ -834,7 +1183,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E372A1',
   },
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   membersModal: {

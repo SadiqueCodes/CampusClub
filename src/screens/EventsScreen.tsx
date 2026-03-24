@@ -7,10 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 
 export const EventsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { events, currentUser } = useStore();
-
-  // Filter events created by current user
-  const myEvents = events.filter((event) => event.createdBy === currentUser?.id);
+  const { events } = useStore();
+  const allEvents = [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return (
     <View style={styles.container}>
@@ -18,25 +16,23 @@ export const EventsScreen: React.FC = () => {
         colors={['#E372A1', '#CE678A', '#B06579']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>My Events</Text>
+        <Text style={styles.headerTitle}>All Events</Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {myEvents.length === 0 ? (
+        {allEvents.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No events created yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create events from the home screen
-            </Text>
+            <Text style={styles.emptyText}>No events yet</Text>
+            <Text style={styles.emptySubtext}>Events will appear here once created</Text>
           </View>
         ) : (
           <View style={styles.eventsList}>
-            {myEvents.map((event) => (
+            {allEvents.map((event) => (
               <TouchableOpacity
                 key={event.id}
                 style={styles.eventCard}
-                onPress={() => navigation.navigate('ManageEvent', { event })}
+                onPress={() => navigation.navigate('EventDetail', { event })}
               >
                 <View style={styles.eventHeader}>
                   <View style={styles.eventInfo}>

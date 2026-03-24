@@ -15,7 +15,7 @@ router.get('/same-college', requireAuth, async (req, res) => {
     // Get current user's college_id
     const { data: userProfile, error: userError } = await supabaseServer
       .from('profiles')
-      .select('college_id')
+      .select('college_id, college_name')
       .eq('id', userId)
       .single();
 
@@ -24,12 +24,35 @@ router.get('/same-college', requireAuth, async (req, res) => {
     }
 
     const userCollegeId = userProfile.college_id;
+    let resolvedCollegeId = userCollegeId;
+    if (!resolvedCollegeId && userProfile?.college_name) {
+      const { data: collegeByName } = await supabaseServer
+        .from('colleges')
+        .select('id, name')
+        .ilike('name', userProfile.college_name)
+        .limit(1)
+        .maybeSingle();
+      if (collegeByName) {
+        resolvedCollegeId = String((collegeByName as any).id);
+        await supabaseServer
+          .from('profiles')
+          .update({
+            college_id: resolvedCollegeId,
+            college_name: (collegeByName as any).name || userProfile.college_name || null,
+          })
+          .eq('id', userId);
+      }
+    }
+
+    if (!resolvedCollegeId) {
+      return res.json({ data: [] });
+    }
 
     // Get all users from the same college
     const { data: collegeUsers, error: collegeError } = await supabaseServer
       .from('profiles')
-      .select('id, name, college_name, major, year, semester, profile_photo')
-      .eq('college_id', userCollegeId)
+      .select('id, name, email, college_id, college_name, major, year, semester, profile_photo, interests, clubs_joined, clubs_leading, events_attended, rating, total_transactions')
+      .eq('college_id', resolvedCollegeId)
       .neq('id', userId) // Exclude the current user
       .order('name', { ascending: true });
 

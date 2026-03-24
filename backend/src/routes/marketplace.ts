@@ -34,6 +34,9 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     if (!payload.title || typeof payload.price === 'undefined') {
       return res.status(400).json({ error: 'Missing title or price' });
     }
+    if (!payload.seller_phone || !/^\+91\d{10}$/.test(String(payload.seller_phone))) {
+      return res.status(400).json({ error: 'Invalid seller phone. Use +91 followed by 10 digits.' });
+    }
 
     const sellerId = (req as any).user.id;
 
@@ -51,6 +54,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       images: payload.images || [],
       seller_id: sellerId,
       seller_name: payload.seller_name || null,
+      seller_phone: payload.seller_phone || null,
       seller_major: payload.seller_major || null,
       seller_year: payload.seller_year || null,
       seller_college_name: profileData?.college_name || null,
@@ -68,6 +72,68 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('POST /api/marketplace error', err.message || err);
     res.status(500).json({ error: 'Failed to create marketplace item' });
+  }
+});
+
+// Update listing status (owner only)
+router.patch('/:id/status', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const listingId = req.params.id;
+    const sellerId = (req as any).user.id;
+    const status = String(req.body?.status || '').toLowerCase();
+    if (!['active', 'reserved', 'sold'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const { data: existing, error: existingErr } = await supabaseServer
+      .from('marketplace_items')
+      .select('id, seller_id')
+      .eq('id', listingId)
+      .single();
+    if (existingErr) throw existingErr;
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+    if (existing.seller_id !== sellerId) return res.status(403).json({ error: 'Not allowed' });
+
+    const { data, error } = await supabaseServer
+      .from('marketplace_items')
+      .update({ status })
+      .eq('id', listingId)
+      .select('*')
+      .single();
+    if (error) throw error;
+
+    res.json({ data });
+  } catch (err: any) {
+    console.error('PATCH /api/marketplace/:id/status error', err.message || err);
+    res.status(500).json({ error: 'Failed to update listing status' });
+  }
+});
+
+// Delete listing (owner only)
+router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const listingId = req.params.id;
+    const sellerId = (req as any).user.id;
+
+    const { data: existing, error: existingErr } = await supabaseServer
+      .from('marketplace_items')
+      .select('id, seller_id')
+      .eq('id', listingId)
+      .single();
+    if (existingErr) throw existingErr;
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+    if (existing.seller_id !== sellerId) return res.status(403).json({ error: 'Not allowed' });
+
+    const { error } = await supabaseServer
+      .from('marketplace_items')
+      .delete()
+      .eq('id', listingId);
+    if (error) throw error;
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('DELETE /api/marketplace/:id error', err.message || err);
+    res.status(500).json({ error: 'Failed to delete listing' });
   }
 });
 
