@@ -131,7 +131,7 @@ export const ClubsScreen: React.FC = () => {
 
   // Filter out clubs the user already belongs to
   const availableClubs = filteredClubs.filter(
-    (club) => !club.memberIds.includes(currentUser?.id || '')
+    (club) => !(club.memberIds || []).includes(currentUser?.id || '')
   );
 
   return (

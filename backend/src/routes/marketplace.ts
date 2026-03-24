@@ -37,6 +37,13 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 
     const sellerId = (req as any).user.id;
 
+    // Fetch seller's college info
+    const { data: profileData } = await supabaseServer
+      .from('profiles')
+      .select('college_id, college_name')
+      .eq('id', sellerId)
+      .single();
+
     const insertRow = {
       title: payload.title,
       description: payload.description || null,
@@ -46,7 +53,10 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       seller_name: payload.seller_name || null,
       seller_major: payload.seller_major || null,
       seller_year: payload.seller_year || null,
+      seller_college_name: profileData?.college_name || null,
       seller_rating: payload.seller_rating || null,
+      college_id: profileData?.college_id || null,
+      college_name: profileData?.college_name || null,
       status: 'active',
       created_at: new Date(),
     };

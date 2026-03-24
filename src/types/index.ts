@@ -6,6 +6,7 @@ export interface User {
   collegeName: string;
   major: string;
   year: 'Freshman' | 'Sophomore' | 'Junior' | 'Senior';
+  semester: string;
   profilePhoto?: string;
   interests: string[];
   clubsJoined: string[];

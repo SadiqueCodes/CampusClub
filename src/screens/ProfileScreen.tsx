@@ -15,7 +15,27 @@ export const ProfileScreen: React.FC = () => {
     Senior: 'Fourth Year',
   };
 
-  if (!currentUser) return null;
+  if (!currentUser) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#E372A1', '#CE678A', '#B06579']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.headerTitle}>Profile</Text>
+              <Text style={styles.headerSubtitle}>Session still loading</Text>
+            </View>
+          </View>
+        </LinearGradient>
+        <View style={styles.emptyProfileState}>
+          <Ionicons name="person-circle-outline" size={54} color="#D1D5DB" />
+          <Text style={styles.emptyProfileText}>Could not load your profile yet</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -50,7 +70,7 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.profileDetails}>
               <Text style={styles.name}>{currentUser.name}</Text>
               <Text style={styles.metaText}>
-                {currentUser.major} • {yearLabelMap[currentUser.year] || currentUser.year}
+                {currentUser.major} • {yearLabelMap[currentUser.year] || currentUser.year} • Sem {currentUser.semester}
               </Text>
               <View style={styles.detailRow}>
                 <Ionicons name="mail-outline" size={16} color="#B06579" />
@@ -499,5 +519,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#E372A1',
+  },
+  emptyProfileState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+  },
+  emptyProfileText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

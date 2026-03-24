@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions, Modal, TextInput, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Line, Defs, Pattern, Rect } from 'react-native-svg';
@@ -95,6 +95,32 @@ export const HomeScreen: React.FC = () => {
     };
   }, [currentUser?.id]);
 
+  // Refetch data when screen comes into focus (e.g., after creating a club)
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser?.id) {
+        fetchInitialData().catch((err) => console.error('Focus refetch error', err));
+      }
+    }, [currentUser?.id, fetchInitialData])
+  );
+
+  // Refresh when returning to Home so new clubs made on another device appear without a manual reload
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          await fetchInitialData();
+        } catch (err) {
+          if (active) console.error('Error refreshing data on focus', err);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [fetchInitialData, currentUser?.id])
+  );
+
   const getClubIcon = (type: string) => {
     switch (type) {
       case 'Arts & Culture':
@@ -135,7 +161,7 @@ export const HomeScreen: React.FC = () => {
 
   const getMyClubs = () => {
     if (!currentUser?.id) return [];
-    return clubs.filter((club) => club.memberIds.includes(currentUser.id));
+    return clubs.filter((club) => (club.memberIds || []).includes(currentUser.id));
   };
 
   const getClubRecommendations = () => {
@@ -188,7 +214,7 @@ export const HomeScreen: React.FC = () => {
 
   const renderClubCard = ({ item }: { item: Club }) => {
     const [gradientStart, gradientEnd] = getClubGradient(item);
-    const isMember = currentUser ? item.memberIds.includes(currentUser.id) : false;
+    const isMember = currentUser ? (item.memberIds || []).includes(currentUser.id) : false;
     const isPending = pendingRequestClubIds.has(item.id);
     let ctaLabel = 'Apply';
     if (isMember) {

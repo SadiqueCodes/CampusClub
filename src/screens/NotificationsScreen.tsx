@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { JoinRequest } from '../types';
+import supabase from '../lib/supabase';
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -15,6 +16,7 @@ export const NotificationsScreen: React.FC = () => {
   const chats = useStore((state) => state.chats);
   const updateChat = useStore((state) => state.updateChat);
   const addMemberToClub = useStore((state) => state.addMemberToClub);
+  const fetchChats = useStore((state) => state.fetchChats);
   const myId = currentUser?.id || '';
 
   const myApplications = useMemo(
@@ -67,19 +69,38 @@ export const NotificationsScreen: React.FC = () => {
     const club = clubs.find((c) => c.id === clubId);
     if (!club) return;
 
-    if (!club.memberIds.includes(userId)) {
+    // Add to club members
+    if (!(club.memberIds || []).includes(userId)) {
       await addMemberToClub(club.id, userId);
     }
 
+    // Add to chat participants and persist to database
     const clubChat = chats.find((chat) => chat.clubId === clubId);
-    if (clubChat && !clubChat.participantIds.includes(userId)) {
-      updateChat(clubChat.id, { participantIds: [...clubChat.participantIds, userId] });
+    if (clubChat && !(clubChat.participantIds || []).includes(userId)) {
+      const updatedParticipants = [...(clubChat.participantIds || []), userId];
+      updateChat(clubChat.id, { participantIds: updatedParticipants });
+      
+      // Persist to Supabase
+      try {
+        await supabase
+          .from('chats')
+          .update({ participant_ids: updatedParticipants })
+          .eq('id', clubChat.id);
+      } catch (err) {
+        console.warn('Failed to update chat participants in database', err);
+      }
     }
   };
 
   const handleApplicationDecision = async (request: JoinRequest, decision: 'accepted' | 'rejected') => {
     if (decision === 'accepted') {
       await addUserToClub(request.clubId, request.userId);
+      // Refetch chats so the new member can see the group chat
+      try {
+        await fetchChats();
+      } catch (err) {
+        console.warn('Failed to refetch chats after accepting', err);
+      }
     }
     await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
   };
@@ -90,6 +111,12 @@ export const NotificationsScreen: React.FC = () => {
   ) => {
     if (decision === 'accepted' && request.userId === myId) {
       await addUserToClub(request.clubId, request.userId);
+      // Refetch chats so we can see the group chat
+      try {
+        await fetchChats();
+      } catch (err) {
+        console.warn('Failed to refetch chats after accepting invitation', err);
+      }
     }
     await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
   };

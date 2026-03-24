@@ -25,6 +25,7 @@ import { Message } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const EMPTY_MESSAGES: Message[] = [];
 const emojiOptions = ['👥', '🎨', '💻', '⚽️', '🎭', '🎵', '📚'];
 
 export const ChatDetailScreen: React.FC = () => {
@@ -33,10 +34,12 @@ export const ChatDetailScreen: React.FC = () => {
   const { chatId } = route.params;
   const insets = useSafeAreaInsets();
 
+  // Subscribe directly to messages for this chat to ensure re-renders on realtime updates
+  const messages = useStore((state) => state.messages[chatId] ?? EMPTY_MESSAGES);
+  
   const {
     chats,
     currentUser,
-    getMessagesForChat,
     addMessage,
     updateChat,
     fetchMessagesForChat,
@@ -61,7 +64,6 @@ export const ChatDetailScreen: React.FC = () => {
   const moreButtonRef = useRef<any>(null);
 
   const chat = chats.find((c) => c.id === chatId);
-  const messages = getMessagesForChat(chatId);
   const club = chat?.clubId ? clubs.find((c) => c.id === chat.clubId) : undefined;
   const members = useMemo(() => club?.memberIds || chat?.participantIds || [], [club, chat]);
   const clubEvents = useMemo(() => (club ? events.filter((event) => event.clubId === club.id) : []), [events, club?.id]);
@@ -73,23 +75,39 @@ export const ChatDetailScreen: React.FC = () => {
     }
   }, [chat]);
 
+  // Log when messages change to verify realtime updates are working
+  useEffect(() => {
+    console.log('[CHAT-MESSAGES] Updated:', messages.length, 'messages');
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      console.log('[CHAT-MESSAGES] Latest:', lastMsg.senderName, '→', lastMsg.text.substring(0, 40));
+      // Scroll to bottom when new messages arrive
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
+
   useEffect(() => {
     // Load messages for this chat from backend
     if (currentUser && chat) {
+      console.log('[CHAT] Loading messages for chat:', chatId);
       fetchMessagesForChat(chatId);
     }
 
     // Subscribe to realtime messages for this chat while screen is active
     if (chat) {
       try {
+        console.log('[CHAT] Setting up realtime subscription for chat:', chatId);
         useStore.getState().subscribeToChatMessages(chatId);
       } catch (e) {
-        console.warn('subscribeToChatMessages failed', e);
+        console.warn('[CHAT] subscribeToChatMessages failed', e);
       }
     }
 
     return () => {
       try {
+        console.log('[CHAT] Cleaning up realtime subscription for chat:', chatId);
         useStore.getState().unsubscribeFromChatMessages(chatId);
       } catch (e) {
         // ignore
@@ -143,15 +161,12 @@ export const ChatDetailScreen: React.FC = () => {
           <Text style={[styles.messageText, isOwnMessage ? styles.ownMessageText : styles.otherMessageText]}>
             {item.text}
           </Text>
-          {item.status === 'pending' && (
-            <View style={styles.pendingRow}>
-              <ActivityIndicator size="small" color="#6B7280" />
-              <Text style={styles.messageStatus}> Sending…</Text>
-            </View>
-          )}
-          {item.status === 'failed' && (
-            <TouchableOpacity onPress={() => useStore.getState().resendMessage(chatId, item.id)} style={styles.failedBadge}>
-              <Text style={styles.failedText}>Failed — Tap to retry</Text>
+          {isOwnMessage && item.status === 'failed' && (
+            <TouchableOpacity 
+              style={styles.failedAlertContainer}
+              onPress={() => useStore.getState().resendMessage(chatId, item.id)}
+            >
+              <Ionicons name="alert-circle" size={14} color="#EF4444" />
             </TouchableOpacity>
           )}
           <Text style={[styles.messageTime, isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime]}>
@@ -368,6 +383,7 @@ export const ChatDetailScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
+        extraData={messages}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
@@ -428,7 +444,6 @@ export const ChatDetailScreen: React.FC = () => {
               actionItems.map((action) => (
                 <TouchableOpacity key={action.label} style={styles.popoverItem} onPress={action.onPress}>
                   <Text style={styles.popoverItemText}>{action.label}</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                 </TouchableOpacity>
               ))
             )}
@@ -1066,5 +1081,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#fff',
+  },
+  failedAlertContainer: {
+    marginTop: 4,
+    marginBottom: 4,
   },
 });

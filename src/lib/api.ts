@@ -58,7 +58,15 @@ export async function postMessageSmart(chatId: string, text: string) {
 // If BACKEND_URL is not configured, fall back to inserting directly into Supabase (useful for dev)
 // Note: this requires your Supabase RLS/policies to allow the client to insert messages.
 export async function postMessageDirect(chatId: string, text: string) {
-  const { data, error } = await supabase.from('messages').insert([{ chat_id: chatId, text }]).select().single();
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  const userName = userData?.user?.user_metadata?.name || userData?.user?.email || 'Member';
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert([{ chat_id: chatId, text, sender_id: userId, sender_name: userName }])
+    .select()
+    .single();
   if (error) throw error;
   return { data };
 }
@@ -132,4 +140,26 @@ export async function updateClub(clubId: string, updates: Record<string, any>) {
   return res.json();
 }
 
-export default { postMessage, createClub, createChat, updateClub };
+export async function get(endpoint: string) {
+  if (!BACKEND_URL) {
+    throw new Error('Backend URL not configured.');
+  }
+  const sessionRes = await supabase.auth.getSession();
+  const token = (sessionRes as any)?.data?.session?.access_token;
+
+  const res = await fetch(`${BACKEND_URL.replace(/\/$/, '')}/api${endpoint}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to fetch: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export default { postMessage, createClub, createChat, updateClub, get };

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import supabaseServer from '../supabaseClient';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -18,11 +19,30 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const payload = req.body;
     if (!payload.title || !payload.club_id || !payload.date) {
       return res.status(400).json({ error: 'Missing title, club_id or date' });
+    }
+
+    const createdBy = (req as any).user?.id || payload.created_by || null;
+    
+    // Fetch creator's college info
+    let collegeId = null;
+    let collegeName = null;
+    
+    if (createdBy) {
+      const { data: profileData } = await supabaseServer
+        .from('profiles')
+        .select('college_id, college_name')
+        .eq('id', createdBy)
+        .single();
+      
+      if (profileData) {
+        collegeId = profileData.college_id;
+        collegeName = profileData.college_name;
+      }
     }
 
     const { data, error } = await supabaseServer.from('events').insert([
@@ -31,10 +51,12 @@ router.post('/', async (req, res) => {
         description: payload.description || null,
         club_id: payload.club_id,
         club_name: payload.club_name || null,
+        college_id: collegeId,
+        college_name: collegeName,
         date: payload.date,
         time: payload.time || null,
         location: payload.location || null,
-        created_by: payload.created_by || null,
+        created_by: createdBy,
         created_at: new Date(),
       },
     ]).select().single();

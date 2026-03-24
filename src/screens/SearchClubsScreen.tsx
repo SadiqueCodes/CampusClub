@@ -42,7 +42,7 @@ export const SearchClubsScreen: React.FC = () => {
   const handleRequestJoin = async (club: Club) => {
     if (!currentUser) return;
     if (requestedClubIds.includes(club.id)) return;
-    if (club.memberIds.includes(myId)) {
+    if ((club.memberIds || []).includes(myId)) {
       Alert.alert('Already joined', 'You are already a member of this club.');
       return;
     }
@@ -92,7 +92,7 @@ export const SearchClubsScreen: React.FC = () => {
         ) : (
           filteredClubs.map((club) => {
             const isRequested = requestedClubIds.includes(club.id);
-            const isMember = club.memberIds.includes(myId);
+            const isMember = (club.memberIds || []).includes(myId);
             const buttonLabel = isMember ? 'Already joined' : isRequested ? 'Request Sent' : 'Request to Join';
             const buttonDisabled = isRequested;
             return (

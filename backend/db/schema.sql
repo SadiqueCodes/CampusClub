@@ -3,6 +3,35 @@
 -- Extensions
 create extension if not exists "uuid-ossp";
 
+-- ALTER existing tables to add college_id columns (migration)
+alter table if exists public.clubs add column if not exists college_id text;
+alter table if exists public.clubs add column if not exists college_name text;
+alter table if exists public.events add column if not exists college_id text;
+alter table if exists public.events add column if not exists college_name text;
+alter table if exists public.marketplace_items add column if not exists college_id text;
+alter table if exists public.marketplace_items add column if not exists college_name text;
+alter table if exists public.marketplace_items add column if not exists seller_college_name text;
+alter table if exists public.profiles add column if not exists semester text;
+
+-- Colleges
+create table if not exists public.colleges (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null unique,
+  state text,
+  created_at timestamptz default now()
+);
+
+alter table public.colleges enable row level security;
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'colleges' and policyname = 'colleges_public_read'
+  ) then
+    create policy "colleges_public_read" on public.colleges
+      for select using (true);
+  end if;
+end $$;
+
 -- Profiles
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -12,6 +41,7 @@ create table if not exists public.profiles (
   college_name text,
   major text,
   year text,
+  semester text,
   profile_photo text,
   interests text[] default '{}'::text[],
   clubs_joined text[] default '{}'::text[],
@@ -47,6 +77,8 @@ create table if not exists public.clubs (
   description text,
   leader_id uuid references public.profiles(id),
   leader_name text,
+  college_id text,
+  college_name text,
   member_ids uuid[] default '{}'::uuid[],
   member_count int default 0,
   created_at timestamptz default now(),
@@ -60,15 +92,23 @@ create table if not exists public.clubs (
 alter table public.clubs enable row level security;
 do $$
 begin
+  -- Drop old policies if they exist
+  drop policy if exists "clubs_public_read" on public.clubs;
+  
   if not exists (
-    select 1 from pg_policies where policyname = 'clubs_public_read' and tablename = 'clubs'
+    select 1 from pg_policies where policyname = 'clubs_same_college_read' and tablename = 'clubs'
   ) then
-    create policy "clubs_public_read" on public.clubs for select using (true);
+    create policy "clubs_same_college_read" on public.clubs for select using (
+      college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'clubs_leader_insert' and tablename = 'clubs'
   ) then
-    create policy "clubs_leader_insert" on public.clubs for insert with check (auth.uid() = leader_id);
+    create policy "clubs_leader_insert" on public.clubs for insert with check (
+      auth.uid() = leader_id 
+      and college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'clubs_leader_update' and tablename = 'clubs'
@@ -129,6 +169,8 @@ create table if not exists public.events (
   description text,
   club_id uuid references public.clubs(id) on delete cascade,
   club_name text,
+  college_id text,
+  college_name text,
   date timestamptz,
   time text,
   location text,
@@ -142,15 +184,23 @@ create table if not exists public.events (
 alter table public.events enable row level security;
 do $$
 begin
+  -- Drop old policies if they exist
+  drop policy if exists "events_public_read" on public.events;
+  
   if not exists (
-    select 1 from pg_policies where policyname = 'events_public_read' and tablename = 'events'
+    select 1 from pg_policies where policyname = 'events_same_college_read' and tablename = 'events'
   ) then
-    create policy "events_public_read" on public.events for select using (true);
+    create policy "events_same_college_read" on public.events for select using (
+      college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'events_author_insert' and tablename = 'events'
   ) then
-    create policy "events_author_insert" on public.events for insert with check (auth.uid() = created_by);
+    create policy "events_author_insert" on public.events for insert with check (
+      auth.uid() = created_by
+      and college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'events_author_update' and tablename = 'events'
@@ -170,7 +220,10 @@ create table if not exists public.marketplace_items (
   seller_name text,
   seller_major text,
   seller_year text,
+  seller_college_name text,
   seller_rating numeric default 0,
+  college_id text,
+  college_name text,
   status text default 'active' check (status in ('active','sold','reserved')),
   created_at timestamptz default now()
 );
@@ -178,15 +231,23 @@ create table if not exists public.marketplace_items (
 alter table public.marketplace_items enable row level security;
 do $$
 begin
+  -- Drop old policies if they exist
+  drop policy if exists "marketplace_public_read" on public.marketplace_items;
+  
   if not exists (
-    select 1 from pg_policies where policyname = 'marketplace_public_read' and tablename = 'marketplace_items'
+    select 1 from pg_policies where policyname = 'marketplace_same_college_read' and tablename = 'marketplace_items'
   ) then
-    create policy "marketplace_public_read" on public.marketplace_items for select using (true);
+    create policy "marketplace_same_college_read" on public.marketplace_items for select using (
+      college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'marketplace_owner_insert' and tablename = 'marketplace_items'
   ) then
-    create policy "marketplace_owner_insert" on public.marketplace_items for insert with check (auth.uid() = seller_id);
+    create policy "marketplace_owner_insert" on public.marketplace_items for insert with check (
+      auth.uid() = seller_id
+      and college_id = (select college_id from public.profiles where id = auth.uid())
+    );
   end if;
   if not exists (
     select 1 from pg_policies where policyname = 'marketplace_owner_update' and tablename = 'marketplace_items'
@@ -322,7 +383,8 @@ end $$;
 */
 
 -- Helper view
-create or replace view public.club_with_leader as
+drop view if exists public.club_with_leader;
+create view public.club_with_leader as
 select c.*, p.name as leader_name_from_profiles
 from public.clubs c
 left join public.profiles p on p.id = c.leader_id;

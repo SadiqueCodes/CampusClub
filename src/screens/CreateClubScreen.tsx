@@ -37,54 +37,93 @@ export const CreateClubScreen: React.FC = () => {
 
   const myClubs = useMemo(() => {
     if (!currentUser?.id) return [];
-    return clubs.filter((club) => club.memberIds.includes(currentUser.id));
+    return clubs.filter((club) => (club.memberIds || []).includes(currentUser.id));
   }, [clubs, currentUser?.id]);
   const [activeClubId, setActiveClubId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
-  // Potential members — load from Supabase profiles (exclude current user)
+  // Potential members — load from backend API (same college only)
   const [potentialMembers, setPotentialMembers] = useState<User[]>([]);
 
   useEffect(() => {
     (async () => {
+      if (!isBackendConfigured()) {
+        if (!currentUser?.id || !currentUser.collegeId) {
+          setPotentialMembers([]);
+          return;
+        }
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, name, email, college_id, college_name, major, year, semester, profile_photo, interests, clubs_joined, clubs_leading, events_attended, rating, total_transactions')
+            .eq('college_id', currentUser.collegeId)
+            .neq('id', currentUser.id)
+            .order('name', { ascending: true });
+          if (error) throw error;
+          const list = (data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name || 'Student',
+            email: p.email || '',
+            collegeId: p.college_id || '',
+            collegeName: p.college_name || '',
+            major: p.major || '',
+            year: p.year || 'Freshman',
+            semester: p.semester || '',
+            profilePhoto: p.profile_photo || undefined,
+            interests: p.interests || [],
+            clubsJoined: p.clubs_joined || [],
+            clubsLeading: p.clubs_leading || [],
+            eventsAttended: p.events_attended || 0,
+            rating: p.rating || 0,
+            totalTransactions: p.total_transactions || 0,
+          })) as User[];
+          setPotentialMembers(list);
+        } catch (e) {
+          console.warn('fetch same-college users (supabase fallback) error', e);
+          setPotentialMembers([]);
+        }
+        return;
+      }
       try {
-        const { data, error } = await supabase.from('profiles').select('*').limit(30);
-        if (!error && data) {
-          // Filter out current user
-          const list = (data as any[])
-            .filter((p) => p.id !== currentUser?.id)
-            .map((p) => ({
-              id: p.id,
-              name: p.name,
-              email: p.email,
-              collegeId: p.college_id || p.collegeId || '',
-              collegeName: p.college_name || p.collegeName || '',
-              major: p.major || '',
-              year: p.year || 'Freshman',
-              interests: p.interests || [],
-              clubsJoined: p.clubs_joined || p.clubsJoined || [],
-              clubsLeading: p.clubs_leading || p.clubsLeading || [],
-              eventsAttended: p.events_attended || 0,
-              rating: p.rating || 0,
-              totalTransactions: p.total_transactions || 0,
-            })) as User[];
+        // Fetch only users from the same college
+        const response = await api.get('/users/same-college');
+        const data = response.data?.data;
+        
+        if (data && Array.isArray(data)) {
+          // Map response to User type
+          const list = data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            collegeId: p.college_id || '',
+            collegeName: p.college_name || '',
+            major: p.major || '',
+            year: p.year || 'Freshman',
+            semester: p.semester || '',
+            interests: p.interests || [],
+            clubsJoined: p.clubs_joined || [],
+            clubsLeading: p.clubs_leading || [],
+            eventsAttended: p.events_attended || 0,
+            rating: p.rating || 0,
+            totalTransactions: p.total_transactions || 0,
+          })) as User[];
           setPotentialMembers(list);
           return;
         }
       } catch (e) {
-        console.warn('fetch profiles error', e);
+        console.warn('fetch same-college users error', e);
       }
       // Fallback: keep empty list
       setPotentialMembers([]);
     })();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.collegeId]);
 
   const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
 
   const availableInterests = useMemo(() => {
     const interestSet = new Set<string>();
     potentialMembers.forEach((member) => {
-      member.interests.forEach((interest) => interestSet.add(interest));
+      (member.interests || []).forEach((interest) => interestSet.add(interest));
     });
     return Array.from(interestSet).slice(0, 8);
   }, [potentialMembers]);
@@ -111,7 +150,7 @@ export const CreateClubScreen: React.FC = () => {
   const filteredMembers = useMemo(() => {
     return potentialMembers.filter((member) => {
       const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesInterest = selectedInterest ? member.interests.includes(selectedInterest) : true;
+      const matchesInterest = selectedInterest ? (member.interests || []).includes(selectedInterest) : true;
       return matchesSearch && matchesInterest;
     });
   }, [potentialMembers, searchQuery, selectedInterest]);
@@ -174,7 +213,111 @@ export const CreateClubScreen: React.FC = () => {
 
   const createLocalClub = async () => {
     if (!currentUser) return;
-    const newClub: Club = {
+
+    // Try to persist the club directly to Supabase (client-side) when backend is not configured.
+    // Falls back to purely local state if the insert fails (e.g., RLS).
+    try {
+      // 1) Create the club row — RLS requires leader_id to match auth.uid()
+      // Only insert columns that exist in the database schema
+      const insertClub = {
+        name: clubName,
+        type: clubType,
+        description: clubDescription || null,
+        leader_id: currentUser.id,
+        leader_name: currentUser.name,
+        college_id: currentUser.collegeId || null,
+        college_name: currentUser.collegeName || null,
+        member_ids: [currentUser.id],
+        member_count: 1,
+        logo_emoji: '👥',
+      } as any;
+
+      const { data: clubRow, error: clubErr } = await supabase
+        .from('clubs')
+        .insert(insertClub)
+        .select('*')
+        .single();
+
+      if (clubErr || !clubRow) throw clubErr || new Error('Club insert failed');
+
+      // 2) Create a group chat tied to the club
+      let createdChatId: string = '';
+      try {
+        const { data: chatRow, error: chatErr } = await supabase
+          .from('chats')
+          .insert({
+            type: 'group',
+            name: clubRow.name,
+            participant_ids: [currentUser.id],
+            club_id: clubRow.id,
+          })
+          .select('*')
+          .single();
+
+        if (chatErr) throw chatErr;
+        createdChatId = chatRow?.id || '';
+      } catch (e) {
+        console.warn('Club chat creation failed; continuing without chat id', e);
+        createdChatId = `chat_${Date.now()}`;
+      }
+
+      // 3) Update the club with the group_chat_id (best-effort)
+      try {
+        if (createdChatId) {
+          await supabase.from('clubs').update({ group_chat_id: createdChatId }).eq('id', clubRow.id);
+        }
+      } catch (e) {
+        console.warn('Failed to update club.group_chat_id', e);
+      }
+
+      // 4) Reflect in local state (provide safe defaults for missing schema fields)
+      const newClub: Club = {
+        id: clubRow.id,
+        name: clubRow.name,
+        type: clubRow.type,
+        description: clubRow.description || '',
+        leaderId: clubRow.leader_id || currentUser.id,
+        leaderName: clubRow.leader_name || currentUser.name,
+        memberIds: Array.isArray(clubRow.member_ids) ? clubRow.member_ids : [currentUser.id],
+        memberCount: clubRow.member_count || 1,
+        createdAt: clubRow.created_at ? new Date(clubRow.created_at) : new Date(),
+        groupChatId: createdChatId,
+        logoEmoji: clubRow.logo_emoji || '👥',
+        upcomingEvents: clubRow.upcoming_events || 0,
+      };
+
+      addClub(newClub);
+      addChat({
+        id: createdChatId,
+        type: 'group',
+        name: newClub.name,
+        participantIds: [currentUser.id],
+        avatarEmoji: '👥',
+        lastMessage: {
+          id: '1',
+          chatId: createdChatId,
+          senderId: 'system',
+          senderName: 'System',
+          text: `${newClub.name} group created!`,
+          timestamp: new Date(),
+        },
+        lastMessageTime: new Date(),
+        unreadCount: 0,
+        clubId: newClub.id,
+      });
+
+      setActiveClubId(newClub.id);
+      setShowCreateModal(false);
+      setIsSwipeMode(true);
+      setCurrentProfileIndex(0);
+      resetForm();
+      return;
+    } catch (persistErr) {
+      console.warn('Direct Supabase club creation failed; using in-memory fallback', persistErr);
+    }
+
+    // Purely local fallback (last resort)
+    const fallbackClub: Club = {
       id: Date.now().toString(),
       name: clubName,
       type: clubType,
@@ -184,54 +327,32 @@ export const CreateClubScreen: React.FC = () => {
       memberIds: [currentUser.id],
       memberCount: 1,
       createdAt: new Date(),
-      groupChatId: '',
+      groupChatId: `chat_${Date.now()}`,
       logoEmoji: '👥',
       upcomingEvents: 0,
     };
 
-    try {
-      const { data: chatRow, error } = await supabase
-        .from('chats')
-        .insert({
-          type: 'group',
-          name: newClub.name,
-          participant_ids: [currentUser.id],
-          club_id: null,
-        })
-        .select('*')
-        .single();
-
-      if (!error && chatRow) {
-        newClub.groupChatId = chatRow.id;
-      } else {
-        newClub.groupChatId = `chat_${Date.now()}`;
-      }
-    } catch (err) {
-      console.warn('Local chat creation fallback failed, using temp id', err);
-      newClub.groupChatId = `chat_${Date.now()}`;
-    }
-
-    addClub(newClub);
+    addClub(fallbackClub);
     addChat({
-      id: newClub.groupChatId,
+      id: fallbackClub.groupChatId,
       type: 'group',
-      name: newClub.name,
+      name: fallbackClub.name,
       participantIds: [currentUser.id],
       avatarEmoji: '👥',
       lastMessage: {
         id: '1',
-        chatId: newClub.groupChatId,
+        chatId: fallbackClub.groupChatId,
         senderId: 'system',
         senderName: 'System',
-        text: `${newClub.name} group created!`,
+        text: `${fallbackClub.name} group created!`,
         timestamp: new Date(),
       },
       lastMessageTime: new Date(),
       unreadCount: 0,
-      clubId: newClub.id,
+      clubId: fallbackClub.id,
     });
 
-    setActiveClubId(newClub.id);
+    setActiveClubId(fallbackClub.id);
     setShowCreateModal(false);
     setIsSwipeMode(true);
     setCurrentProfileIndex(0);

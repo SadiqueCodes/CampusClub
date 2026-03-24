@@ -24,6 +24,31 @@ const normalizeEventRow = (row: any): Event => ({
   createdBy: row.created_by || row.createdBy || '',
 });
 
+const normalizeClubRow = (row: any): Club => ({
+  id: row.id?.toString() || row.id || '',
+  name: row.name || '',
+  type: row.type || '',
+  description: row.description || '',
+  leaderId: row.leader_id || row.leaderId || '',
+  leaderName: row.leader_name || row.leaderName || '',
+  memberIds: Array.isArray(row.member_ids) ? row.member_ids : (row.memberIds || []),
+  memberCount: row.member_count ?? row.memberCount ?? 0,
+  createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+  groupChatId: row.group_chat_id || row.groupChatId || '',
+  logoEmoji: row.logo_emoji || row.logoEmoji || '👥',
+  upcomingEvents: row.upcoming_events ?? row.upcomingEvents ?? 0,
+});
+
+const normalizeMessageRow = (row: any): Message => ({
+  id: row.id,
+  chatId: row.chat_id || row.chatId,
+  senderId: row.sender_id || row.senderId,
+  senderName: row.sender_name || row.senderName,
+  text: row.text,
+  timestamp: row.timestamp ? new Date(row.timestamp) : new Date(),
+  attachments: row.attachments,
+});
+
 const normalizeJoinRequestRow = (row: any): JoinRequest => ({
   id: row.id?.toString() || row.id || '',
   clubId: row.club_id || row.clubId || '',
@@ -49,6 +74,24 @@ const normalizeMarketplaceRow = (row: any): MarketplaceItem => ({
   sellerRating: row.seller_rating ?? row.sellerRating ?? 0,
   status: row.status || 'active',
   createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+});
+
+const normalizeProfileRow = (row: any, fallback?: any): User => ({
+  id: row?.id || fallback?.id || '',
+  name: row?.name || fallback?.user_metadata?.name || 'Student',
+  email: row?.email || fallback?.email || '',
+  collegeId: row?.college_id || row?.collegeId || '',
+  collegeName: row?.college_name || row?.collegeName || '',
+  major: row?.major || '',
+  year: row?.year || 'Freshman',
+  semester: row?.semester || '',
+  profilePhoto: row?.profile_photo || row?.profilePhoto || undefined,
+  interests: Array.isArray(row?.interests) ? row.interests : [],
+  clubsJoined: Array.isArray(row?.clubs_joined) ? row.clubs_joined : (Array.isArray(row?.clubsJoined) ? row.clubsJoined : []),
+  clubsLeading: Array.isArray(row?.clubs_leading) ? row.clubs_leading : (Array.isArray(row?.clubsLeading) ? row.clubsLeading : []),
+  eventsAttended: row?.events_attended ?? row?.eventsAttended ?? 0,
+  rating: row?.rating ?? 0,
+  totalTransactions: row?.total_transactions ?? row?.totalTransactions ?? 0,
 });
 
 interface AppState {
@@ -193,7 +236,7 @@ export const useStore = create<AppState>((set, get) => {
       if (uid) {
         const { data: profileRow, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single();
         if (!pErr && profileRow) {
-          set({ currentUser: profileRow as unknown as User, isAuthenticated: true });
+          set({ currentUser: normalizeProfileRow(profileRow, (data as any).user), isAuthenticated: true });
           return;
         }
       }
@@ -215,14 +258,14 @@ export const useStore = create<AppState>((set, get) => {
           await supabase.from('profiles').upsert(minimal);
           const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', uid).single();
           if (profileRow) {
-            set({ currentUser: profileRow as unknown as User, isAuthenticated: true });
+            set({ currentUser: normalizeProfileRow(profileRow, userInfo.user), isAuthenticated: true });
             return;
           }
         } catch (e) {
           console.warn('ensure profile upsert failed', e);
         }
         // Fallback to a minimal in-memory user if DB is unreachable, but keep this lightweight (not a dev mock)
-        set({ currentUser: { id: userInfo.user.id, name: userInfo.user.user_metadata?.name || 'Student', email: userInfo.user.email || email, collegeId: '', collegeName: '', major: '', year: 'Freshman', interests: [], clubsJoined: [], clubsLeading: [], eventsAttended: 0, rating: 0, totalTransactions: 0 } as User, isAuthenticated: true });
+        set({ currentUser: { id: userInfo.user.id, name: userInfo.user.user_metadata?.name || 'Student', email: userInfo.user.email || email, collegeId: '', collegeName: '', major: '', year: 'Freshman', semester: '', interests: [], clubsJoined: [], clubsLeading: [], eventsAttended: 0, rating: 0, totalTransactions: 0 } as User, isAuthenticated: true });
       }
     } catch (err: any) {
       console.error('signIn error', err.message || err);
@@ -269,7 +312,7 @@ export const useStore = create<AppState>((set, get) => {
         await supabase.from('profiles').upsert(newProfile);
         const { data: profileRow } = await supabase.from('profiles').select('*').eq('id', uid).single();
         if (profileRow) {
-          set({ currentUser: profileRow as unknown as User, isAuthenticated: true });
+          set({ currentUser: normalizeProfileRow(profileRow, (data as any).user), isAuthenticated: true });
           return;
         }
       }
@@ -302,7 +345,7 @@ export const useStore = create<AppState>((set, get) => {
       if (uid) {
         const { data: profileRow, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single();
         if (!pErr && profileRow) {
-          set({ currentUser: profileRow as unknown as User, isAuthenticated: true });
+          set({ currentUser: normalizeProfileRow(profileRow, userData.user), isAuthenticated: true });
         } else if (userData.user) {
           // Try to create a minimal profile row if missing
           try {
@@ -319,13 +362,35 @@ export const useStore = create<AppState>((set, get) => {
             await supabase.from('profiles').upsert(minimal);
             const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', uid).single();
             if (newProfile) {
-              set({ currentUser: newProfile as unknown as User, isAuthenticated: true });
+              set({ currentUser: normalizeProfileRow(newProfile, userData.user), isAuthenticated: true });
             } else {
-              set({ currentUser: null, isAuthenticated: true });
+              set({
+                currentUser: normalizeProfileRow(
+                  {
+                    id: userData.user.id,
+                    name: userData.user.user_metadata?.name || 'Student',
+                    email: userData.user.email || '',
+                    year: 'Freshman',
+                  },
+                  userData.user
+                ),
+                isAuthenticated: true,
+              });
             }
           } catch (e) {
             console.warn('initializeAuth: upsert profile failed', e);
-            set({ currentUser: null, isAuthenticated: true });
+            set({
+              currentUser: normalizeProfileRow(
+                {
+                  id: userData.user.id,
+                  name: userData.user.user_metadata?.name || 'Student',
+                  email: userData.user.email || '',
+                  year: 'Freshman',
+                },
+                userData.user
+              ),
+              isAuthenticated: true,
+            });
           }
         }
       }
@@ -392,7 +457,8 @@ export const useStore = create<AppState>((set, get) => {
     try {
       const { data, error } = await supabase.from('clubs').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      set({ clubs: (data as Club[]) || [] });
+      const normalized = (data || []).map(normalizeClubRow);
+      set({ clubs: normalized });
     } catch (err) {
       console.error('fetchClubs error', err);
     }
@@ -724,8 +790,32 @@ export const useStore = create<AppState>((set, get) => {
         .contains('participant_ids', [userId])
         .order('last_message_time', { ascending: false });
       if (error) throw error;
-      const chats = (data as Chat[]) || [];
-      set({ chats });
+      
+      // Normalize fields from snake_case to camelCase
+      const normalized = (data || []).map((row: any) => ({
+        id: row.id,
+        type: row.type || 'direct',
+        name: row.name,
+        participantIds: Array.isArray(row.participant_ids) ? row.participant_ids : [],
+        avatarEmoji: row.avatar_emoji,
+        avatarImage: row.avatar_image,
+        lastMessage: row.last_message ? {
+          id: row.last_message.id,
+          chatId: row.last_message.chat_id || row.id,
+          senderId: row.last_message.sender_id,
+          senderName: row.last_message.sender_name,
+          text: row.last_message.text,
+          timestamp: row.last_message.timestamp ? new Date(row.last_message.timestamp) : new Date(),
+        } : undefined,
+        lastMessageTime: row.last_message_time ? new Date(row.last_message_time) : new Date(),
+        unreadCount: row.unread_count || 0,
+        clubId: row.club_id,
+        marketplaceItemId: row.marketplace_item_id,
+      } as Chat));
+      
+      // Deduplicate by ID
+      const deduped = Array.from(new Map(normalized.map(c => [c.id, c])).values());
+      set({ chats: deduped });
     } catch (err) {
       console.error('fetchChats error', err);
     }
@@ -753,6 +843,7 @@ export const useStore = create<AppState>((set, get) => {
             try {
               const m = payload.new;
               if (!m) return;
+              console.log('[REALTIME-MSG] Incoming message:', m.id, 'for chat:', chatId);
               const normalized = {
                 id: m.id,
                 chatId: m.chat_id || chatId,
@@ -761,19 +852,37 @@ export const useStore = create<AppState>((set, get) => {
                 text: m.text,
                 timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
                 attachments: m.attachments || null,
+                status: 'sent', // messages from DB are already sent
               } as Message;
-              // Add message to store
+              // Add message to store (also updates chat.lastMessageTime)
               get().addMessage(chatId, normalized);
+              console.log('[REALTIME-MSG] ✓ Message added to state, UI should re-render now');
             } catch (e) {
-              console.warn('realtime message handler error', e);
+              console.warn('[REALTIME-MSG] ERROR handling message:', e);
             }
           }
         )
-        .subscribe();
+        .subscribe((status: any) => {
+          console.log('[REALTIME-SUB]', channelName, '→ Status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('[REALTIME-SUB] ✓ Ready to receive messages for:', chatId);
+          } else if (status === 'CLOSED') {
+            console.warn('[REALTIME-SUB] ⚠ Channel closed for', chatId, '- attempting to reconnect');
+            // Try to reconnect after a delay
+            setTimeout(() => {
+              if (_realtimeSubscriptions.has(chatId)) {
+                console.log('[REALTIME-SUB] Retrying subscription for', chatId);
+                get().subscribeToChatMessages(chatId);
+              }
+            }, 2000);
+          }
+        });
 
       _realtimeSubscriptions.set(chatId, channel);
+      console.log('[REALTIME-SUB] Subscription registered for chat:', chatId);
     } catch (e) {
-      console.warn('subscribeToChatMessages error', e);
+      console.warn('[REALTIME-SUB] ERROR subscribing:', e);
+      console.warn('[REALTIME-SUB] This might be an RLS/permission issue');
     }
   },
 
@@ -841,13 +950,11 @@ export const useStore = create<AppState>((set, get) => {
   updateChat: (chatId, updates) =>
     set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, ...updates } : c)) })),
 
-  addMessage: (chatId, message) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [chatId]: [...(state.messages[chatId] || []), message],
-      },
-      chats: state.chats.map((c) =>
+  addMessage: (chatId, message) => {
+    console.log('[STORE] addMessage called for chat:', chatId, 'msg id:', message.id);
+    return set((state) => {
+      const newMessagesList = [...(state.messages[chatId] || []), message];
+      const newChats = state.chats.map((c) =>
         c.id === chatId
           ? {
               ...c,
@@ -855,8 +962,18 @@ export const useStore = create<AppState>((set, get) => {
               lastMessageTime: message.timestamp,
             }
           : c
-      ),
-    })),
+      );
+      console.log('[STORE] ✓ State updated:', {
+        chatId,
+        totalMsgs: newMessagesList.length,
+        lastMsg: message.text.substring(0, 30),
+      });
+      return {
+        messages: { ...state.messages, [chatId]: newMessagesList },
+        chats: newChats,
+      };
+    });
+  },
 
   updateMessage: (chatId, messageId, updates) =>
     set((state) => {
@@ -898,8 +1015,12 @@ export const useStore = create<AppState>((set, get) => {
           text: m.text,
           timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
           attachments: m.attachments || m.attachments,
+          status: 'sent', // messages fetched from DB are already sent
         })) || [];
-      set((state) => ({ messages: { ...state.messages, [chatId]: normalized as Message[] } }));
+      set((state) => { 
+        console.log('[FETCH-MESSAGES] Loaded', normalized.length, 'messages for chat', chatId);
+        return { messages: { ...state.messages, [chatId]: normalized as Message[] } };
+      });
     } catch (err) {
       console.error('fetchMessagesForChat error', err);
     }

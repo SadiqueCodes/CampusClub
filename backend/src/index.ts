@@ -8,6 +8,7 @@ import marketplaceRouter from './routes/marketplace';
 import chatsRouter from './routes/chats';
 import messagesRouter from './routes/messages';
 import joinRequestsRouter from './routes/joinRequests';
+import usersRouter from './routes/users';
 import { requireAuth } from './middleware/auth';
 import errorHandler from './middleware/errorHandler';
 
@@ -31,6 +32,7 @@ app.use('/api/marketplace', marketplaceRouter);
 app.use('/api/chats', chatsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/join-requests', joinRequestsRouter);
+app.use('/api/users', usersRouter);
 
 // Error handler (last)
 app.use(errorHandler);

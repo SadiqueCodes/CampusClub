@@ -39,12 +39,33 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const leaderId = (req as any).user?.id || payload.leader_id || null;
+    
+    // Fetch leader's college info
+    let collegeId = null;
+    let collegeName = null;
+    
+    if (leaderId) {
+      const { data: profileData, error: profileError } = await supabaseServer
+        .from('profiles')
+        .select('college_id, college_name')
+        .eq('id', leaderId)
+        .single();
+      
+      if (profileData) {
+        collegeId = profileData.college_id;
+        collegeName = profileData.college_name;
+      }
+    }
+
     const { data, error } = await supabaseServer.from('clubs').insert([
       {
         name: payload.name,
         type: payload.type,
         description: payload.description || null,
         leader_id: leaderId,
+        leader_name: payload.leader_name || null,
+        college_id: collegeId,
+        college_name: collegeName,
         created_at: new Date(),
       },
     ]).select().single();

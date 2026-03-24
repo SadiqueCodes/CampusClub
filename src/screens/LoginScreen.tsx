@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated, Alert, Modal, FlatList, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -8,6 +8,7 @@ import { Lobster_400Regular } from '@expo-google-fonts/lobster';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import { User } from '../types';
+import supabase from '../lib/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const yearOptions: Array<{ value: User['year']; label: string }> = [
@@ -16,6 +17,25 @@ const yearOptions: Array<{ value: User['year']; label: string }> = [
   { value: 'Junior', label: 'Third Year' },
   { value: 'Senior', label: 'Fourth Year' },
 ];
+
+const semestersByYear: Record<string, Array<{ value: string; label: string }>> = {
+  'Freshman': [
+    { value: '1', label: 'Semester 1' },
+    { value: '2', label: 'Semester 2' },
+  ],
+  'Sophomore': [
+    { value: '3', label: 'Semester 3' },
+    { value: '4', label: 'Semester 4' },
+  ],
+  'Junior': [
+    { value: '5', label: 'Semester 5' },
+    { value: '6', label: 'Semester 6' },
+  ],
+  'Senior': [
+    { value: '7', label: 'Semester 7' },
+    { value: '8', label: 'Semester 8' },
+  ],
+};
 const interestOptions = [
   'Technology',
   'Design',
@@ -25,6 +45,50 @@ const interestOptions = [
   'Volunteering',
   'Photography',
   'Gaming',
+];
+
+const majorOptions = [
+  'B.Tech CSE',
+  'B.Tech EE',
+  'B.Tech ECE',
+  'B.Tech ME',
+  'B.Tech CE',
+  'B.Tech ChE',
+  'B.Tech Aerospace',
+  'B.Tech Biotech',
+  'B.Sc (Hons) Physics',
+  'B.Sc (Hons) Chemistry',
+  'B.Sc (Hons) Mathematics',
+  'B.Sc (Hons) Biology',
+  'B.Sc (Hons) Botany',
+  'B.Sc (Hons) Zoology',
+  'B.A (Hons) English',
+  'B.A (Hons) Hindi',
+  'B.A (Hons) History',
+  'B.A (Hons) Geography',
+  'B.A (Hons) Economics',
+  'B.A (Hons) Political Science',
+  'B.Comm (Hons)',
+  'BBA',
+  'MBA',
+  'LLB',
+  'LLM',
+  'B.E',
+  'B.Des',
+  'B.Arch',
+  'B.Pharm',
+  'M.Pharm',
+  'MBBS',
+  'BDS',
+  'BNYS',
+  'BCA',
+  'MCA',
+  'B.Ed',
+  'M.Ed',
+  'B.Sc Nursing',
+  'M.Sc',
+  'M.A',
+  'Other',
 ];
 
 export const LoginScreen: React.FC = () => {
@@ -44,11 +108,22 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [signUpStep, setSignUpStep] = useState(1);
   const totalSignUpSteps = 3;
-  const [studentId, setStudentId] = useState('');
   const [collegeName, setCollegeName] = useState('');
+  const [collegeId, setCollegeId] = useState<string | null>(null);
   const [major, setMajor] = useState('');
   const [selectedYear, setSelectedYear] = useState<User['year'] | ''>('');
+  const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+
+  // College dropdown state
+  const [colleges, setColleges] = useState<Array<{ id: number; name: string; state: string }>>([]);
+  const [showCollegeModal, setShowCollegeModal] = useState(false);
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState('');
+  const [loadingColleges, setLoadingColleges] = useState(false);
+
+  // Major dropdown state
+  const [showMajorModal, setShowMajorModal] = useState(false);
+  const [majorSearchQuery, setMajorSearchQuery] = useState('');
 
   // Animation values
   const curvePosition = useRef(new Animated.Value(SCREEN_HEIGHT * 0.62)).current;
@@ -84,6 +159,54 @@ export const LoginScreen: React.FC = () => {
     };
   }, [scrollX]);
 
+  // Fetch colleges from Supabase
+  useEffect(() => {
+    const fetchColleges = async () => {
+      setLoadingColleges(true);
+      try {
+        // If search query exists, search server-side; otherwise fetch initial batch
+        let query = supabase.from('colleges').select('id, name, state');
+
+        if (collegeSearchQuery.trim()) {
+          // Server-side search with ILIKE (PostgreSQL case-insensitive pattern matching)
+          query = query.or(
+            `name.ilike.%${collegeSearchQuery}%,state.ilike.%${collegeSearchQuery}%`
+          );
+        } else {
+          // Initial fetch - first 500 colleges
+          query = query.limit(500);
+        }
+
+        // Always sort by name alphabetically
+        query = query.order('name', { ascending: true });
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('Error fetching colleges:', error.message);
+          setColleges([]);
+        } else if (data) {
+          // Trim names to remove leading/trailing spaces
+          const trimmedData = (data as Array<{ id: number; name: string; state: string }>).map(
+            (college) => ({
+              ...college,
+              name: college.name.trim(),
+              state: college.state?.trim() || '',
+            })
+          );
+          setColleges(trimmedData);
+        }
+      } catch (err) {
+        console.error('Fetch colleges error:', err);
+        setColleges([]);
+      } finally {
+        setLoadingColleges(false);
+      }
+    };
+
+    fetchColleges();
+  }, [collegeSearchQuery]);
+
   const signIn = useStore((state) => state.signIn);
   const signUp = useStore((state) => state.signUp);
   const stepDetails = [
@@ -98,11 +221,14 @@ export const LoginScreen: React.FC = () => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
-    setStudentId('');
     setCollegeName('');
+    setCollegeId(null);
     setMajor('');
     setSelectedYear('');
+    setSelectedSemester('');
     setSelectedInterests([]);
+    setCollegeSearchQuery('');
+    setMajorSearchQuery('');
   };
 
   const toggleInterest = (interest: string) => {
@@ -110,6 +236,27 @@ export const LoginScreen: React.FC = () => {
       prev.includes(interest) ? prev.filter((item) => item !== interest) : [...prev, interest]
     );
   };
+
+  const handleSelectCollege = (college: { id: number; name: string; state: string }) => {
+    setCollegeName(college.name);
+    setCollegeId(college.id.toString());
+    setShowCollegeModal(false);
+    setCollegeSearchQuery('');
+  };
+
+  // Since we're doing server-side search, just use colleges as-is
+  const filteredColleges = colleges;
+
+  const handleSelectMajor = (selectedMajor: string) => {
+    setMajor(selectedMajor);
+    setShowMajorModal(false);
+    setMajorSearchQuery('');
+  };
+
+  const filteredMajors = majorOptions.filter((maj) => {
+    const query = majorSearchQuery.toLowerCase();
+    return maj.toLowerCase().includes(query);
+  });
 
   const validateSignUpStep = (step = signUpStep) => {
     if (step === 1) {
@@ -121,6 +268,14 @@ export const LoginScreen: React.FC = () => {
         Alert.alert('Missing info', 'Please enter a valid email address.');
         return false;
       }
+      const emailLower = email.toLowerCase();
+      if (!emailLower.endsWith('.edu') && !emailLower.endsWith('.edu.in')) {
+        Alert.alert(
+          'Invalid email',
+          'Please use your college email address (must end with .edu or .edu.in).'
+        );
+        return false;
+      }
       if (!password || password.length < 6) {
         Alert.alert('Weak password', 'Use at least 6 characters for your password.');
         return false;
@@ -130,8 +285,8 @@ export const LoginScreen: React.FC = () => {
         return false;
       }
     } else if (step === 2) {
-      if (!collegeName.trim() || !studentId.trim() || !major.trim() || !selectedYear) {
-        Alert.alert('Missing campus info', 'Add your college, ID, major, and year.');
+      if (!collegeName.trim() || !major.trim() || !selectedYear || !selectedSemester) {
+        Alert.alert('Missing campus info', 'Add your college, major, year, and semester.');
         return false;
       }
     }
@@ -169,10 +324,11 @@ export const LoginScreen: React.FC = () => {
         name,
         email,
         password,
-        collegeId: studentId || `ID-${Date.now()}`,
+        collegeId: collegeId || '',
         collegeName: collegeName || 'My Campus',
         major: major || 'Undeclared',
         year: (selectedYear as User['year']) || 'Freshman',
+        semester: selectedSemester || '1',
         interests: selectedInterests.length ? selectedInterests : ['Campus Life'],
       });
       resetSignUpForm();
@@ -358,6 +514,9 @@ export const LoginScreen: React.FC = () => {
                   autoCapitalize="none"
                 />
               </View>
+              <Text style={styles.helperText}>
+                <Ionicons name="information-circle" size={12} color="#9CA3AF" /> Use your college email address (.edu or .edu.in)
+              </Text>
             </View>
 
             <View style={styles.inputContainer}>
@@ -403,44 +562,30 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.stepMetaText}>Step {signUpStep} of {totalSignUpSteps} • Campus details</Text>
             <View style={styles.inputContainer}>
               <Text style={styles.label}>University / College</Text>
-              <View style={styles.inputWrapper}>
+              <TouchableOpacity
+                style={styles.inputWrapper}
+                onPress={() => setShowCollegeModal(true)}
+              >
                 <Ionicons name="school-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Tech University"
-                  placeholderTextColor="#DDD"
-                  value={collegeName}
-                  onChangeText={setCollegeName}
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Student ID</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="card-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. CS2023123"
-                  placeholderTextColor="#DDD"
-                  value={studentId}
-                  onChangeText={setStudentId}
-                />
-              </View>
+                <Text style={[styles.input, !collegeName && styles.inputPlaceholder]}>
+                  {collegeName || 'Select your college'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#B2BEB5" style={styles.inputIcon} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Major</Text>
-              <View style={styles.inputWrapper}>
+              <TouchableOpacity
+                style={styles.inputWrapper}
+                onPress={() => setShowMajorModal(true)}
+              >
                 <Ionicons name="book-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Computer Science"
-                  placeholderTextColor="#DDD"
-                  value={major}
-                  onChangeText={setMajor}
-                />
-              </View>
+                <Text style={[styles.input, !major && styles.inputPlaceholder]}>
+                  {major || 'Select your major'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#B2BEB5" style={styles.inputIcon} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
@@ -450,7 +595,10 @@ export const LoginScreen: React.FC = () => {
                   <TouchableOpacity
                     key={option.value}
                     style={[styles.yearOption, selectedYear === option.value && styles.yearOptionSelected]}
-                    onPress={() => setSelectedYear(option.value)}
+                    onPress={() => {
+                      setSelectedYear(option.value);
+                      setSelectedSemester(''); // Reset semester when year changes
+                    }}
                   >
                     <Text
                       style={[
@@ -464,6 +612,30 @@ export const LoginScreen: React.FC = () => {
                 ))}
               </View>
             </View>
+
+            {selectedYear && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Semester</Text>
+                <View style={styles.yearGrid}>
+                  {semestersByYear[selectedYear]?.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.yearOption, selectedSemester === option.value && styles.yearOptionSelected]}
+                      onPress={() => setSelectedSemester(option.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.yearOptionText,
+                          selectedSemester === option.value && styles.yearOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         );
       case 3:
@@ -497,6 +669,174 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* College Selection Modal */}
+      <Modal
+        visible={showCollegeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCollegeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Your College</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCollegeModal(false);
+                  setCollegeSearchQuery('');
+                }}
+              >
+                <Ionicons name="close" size={24} color="#2D3436" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <Ionicons name="search" size={18} color="#B2BEB5" style={styles.modalSearchIcon} />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search by name or state..."
+                placeholderTextColor="#B2BEB5"
+                value={collegeSearchQuery}
+                onChangeText={setCollegeSearchQuery}
+              />
+            </View>
+
+            {loadingColleges ? (
+              <View style={styles.modalLoadingContainer}>
+                <ActivityIndicator size="large" color="#E372A1" />
+                <Text style={styles.loadingText}>Loading colleges...</Text>
+              </View>
+            ) : colleges.length === 0 ? (
+              <View style={styles.emptyCollegeContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyCollegeText}>No colleges available</Text>
+                <Text style={styles.emptyCollegeSubtext}>
+                  The colleges database is empty. Please contact support.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredColleges}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.modalListContent}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.collegeItem,
+                      collegeName === item.name && styles.collegeItemSelected,
+                    ]}
+                    onPress={() => handleSelectCollege(item)}
+                  >
+                    <View style={styles.collegeItemContent}>
+                      <Text
+                        style={[
+                          styles.collegeItemName,
+                          collegeName === item.name && styles.collegeItemNameSelected,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.collegeItemState,
+                          collegeName === item.name && styles.collegeItemStateSelected,
+                        ]}
+                      >
+                        {item.state}
+                      </Text>
+                    </View>
+                    {collegeName === item.name && (
+                      <Ionicons name="checkmark-circle" size={24} color="#E372A1" />
+                    )}
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyCollegeContainer}>
+                    <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                    <Text style={styles.emptyCollegeText}>No colleges found</Text>
+                    <Text style={styles.emptyCollegeSubtext}>
+                      Try searching with different keywords
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Major Selection Modal */}
+      <Modal
+        visible={showMajorModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMajorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Your Major</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowMajorModal(false);
+                  setMajorSearchQuery('');
+                }}
+              >
+                <Ionicons name="close" size={24} color="#2D3436" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <Ionicons name="search" size={18} color="#B2BEB5" style={styles.modalSearchIcon} />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search by course name..."
+                placeholderTextColor="#B2BEB5"
+                value={majorSearchQuery}
+                onChangeText={setMajorSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={filteredMajors}
+              keyExtractor={(item) => item}
+              contentContainerStyle={styles.modalListContent}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.collegeItem,
+                    major === item && styles.collegeItemSelected,
+                  ]}
+                  onPress={() => handleSelectMajor(item)}
+                >
+                  <View style={styles.collegeItemContent}>
+                    <Text
+                      style={[
+                        styles.collegeItemName,
+                        major === item && styles.collegeItemNameSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </View>
+                  {major === item && (
+                    <Ionicons name="checkmark-circle" size={24} color="#E372A1" />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyCollegeContainer}>
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.emptyCollegeText}>No majors found</Text>
+                  <Text style={styles.emptyCollegeSubtext}>
+                    Try searching with different keywords
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
       {/* Gradient Background */}
       <LinearGradient
 colors={['#B06579', '#CE678A', '#E372A1']}   
@@ -1140,6 +1480,12 @@ const styles = StyleSheet.create({
   eyeIcon: {
     padding: 4,
   },
+  helperText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 6,
+    fontWeight: '500',
+  },
   yearGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1260,5 +1606,123 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#E372A1',
     fontWeight: '600',
+  },
+  // College Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '85%',
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2D3436',
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    height: 44,
+  },
+  modalSearchIcon: {
+    marginRight: 8,
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2D3436',
+  },
+  modalListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  collegeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+  },
+  collegeItemSelected: {
+    backgroundColor: '#FFF5F8',
+    borderColor: '#E372A1',
+  },
+  collegeItemContent: {
+    flex: 1,
+  },
+  collegeItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 4,
+  },
+  collegeItemNameSelected: {
+    color: '#E372A1',
+  },
+  collegeItemState: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+  },
+  collegeItemStateSelected: {
+    color: '#B06579',
+  },
+  modalLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  emptyCollegeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyCollegeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+  },
+  emptyCollegeSubtext: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  inputPlaceholder: {
+    color: '#B2BEB5',
   },
 });
