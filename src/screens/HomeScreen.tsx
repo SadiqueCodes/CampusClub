@@ -560,12 +560,20 @@ export const HomeScreen: React.FC = () => {
             <TextInput
               style={styles.modalInput}
               placeholder="Item title"
+              placeholderTextColor="#9CA3AF"
+              selectionColor="#B06579"
+              cursorColor="#B06579"
+              underlineColorAndroid="transparent"
               value={listingTitle}
               onChangeText={setListingTitle}
             />
             <TextInput
               style={[styles.modalInput, styles.modalTextarea]}
               placeholder="Description"
+              placeholderTextColor="#9CA3AF"
+              selectionColor="#B06579"
+              cursorColor="#B06579"
+              underlineColorAndroid="transparent"
               value={listingDescription}
               onChangeText={setListingDescription}
               multiline
@@ -586,6 +594,10 @@ export const HomeScreen: React.FC = () => {
             <TextInput
               style={styles.modalInput}
               placeholder="Price"
+              placeholderTextColor="#9CA3AF"
+              selectionColor="#B06579"
+              cursorColor="#B06579"
+              underlineColorAndroid="transparent"
               value={listingPrice}
               onChangeText={setListingPrice}
               keyboardType="numeric"
@@ -593,6 +605,10 @@ export const HomeScreen: React.FC = () => {
             <TextInput
               style={styles.modalInput}
               placeholder="Seller phone (10 digits)"
+              placeholderTextColor="#9CA3AF"
+              selectionColor="#B06579"
+              cursorColor="#B06579"
+              underlineColorAndroid="transparent"
               value={listingPhone}
               onChangeText={(value) => setListingPhone(value.replace(/[^\d]/g, '').slice(0, 10))}
               keyboardType="phone-pad"
@@ -1058,6 +1074,7 @@ const styles = StyleSheet.create({
   modalInput: {
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
