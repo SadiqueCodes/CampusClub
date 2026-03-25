@@ -18,7 +18,7 @@ const appJson = require('./app.json');
 const extra = Object.assign({}, appJson.expo?.extra || {}, {
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
-  BACKEND_URL: process.env.BACKEND_URL || '',
+  BACKEND_URL: process.env.BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL || '',
 });
 
 module.exports = () => ({
