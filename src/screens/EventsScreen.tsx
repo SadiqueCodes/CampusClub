@@ -1,38 +1,89 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+type EventsViewMode = 'my' | 'all';
 
 export const EventsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { events } = useStore();
-  const allEvents = [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const route = useRoute<any>();
+  const { events, currentUser } = useStore();
+  const allEvents = useMemo(
+    () => [...events].sort((a, b) => a.date.getTime() - b.date.getTime()),
+    [events]
+  );
+  const myEvents = useMemo(
+    () => allEvents.filter((event) => !!currentUser?.id && event.createdBy === currentUser.id),
+    [allEvents, currentUser?.id]
+  );
+  const publicEvents = useMemo(
+    () => allEvents.filter((event) => !currentUser?.id || event.createdBy !== currentUser.id),
+    [allEvents, currentUser?.id]
+  );
+
+  const [viewMode, setViewMode] = useState<EventsViewMode>('my');
+
+  useEffect(() => {
+    const initialView = route.params?.initialView as EventsViewMode | undefined;
+    if (initialView === 'all' || initialView === 'my') {
+      setViewMode(initialView);
+    } else {
+      setViewMode('my');
+    }
+  }, [route.params?.initialView]);
+
+  const visibleEvents = viewMode === 'my' ? myEvents : publicEvents;
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#E372A1', '#CE678A', '#B06579']}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>All Events</Text>
+      <LinearGradient colors={['#E372A1', '#CE678A', '#B06579']} style={styles.header}>
+        <Text style={styles.headerTitle}>Events</Text>
       </LinearGradient>
 
+      <View style={styles.switchWrap}>
+        <View style={styles.switchTrack}>
+          <TouchableOpacity
+            style={[styles.switchBtn, viewMode === 'my' && styles.switchBtnActive]}
+            onPress={() => setViewMode('my')}
+          >
+            <Text style={[styles.switchText, viewMode === 'my' && styles.switchTextActive]}>My Events</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.switchBtn, viewMode === 'all' && styles.switchBtnActive]}
+            onPress={() => setViewMode('all')}
+          >
+            <Text style={[styles.switchText, viewMode === 'all' && styles.switchTextActive]}>Other Events</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {allEvents.length === 0 ? (
+        {visibleEvents.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No events yet</Text>
-            <Text style={styles.emptySubtext}>Events will appear here once created</Text>
+            <Text style={styles.emptyText}>
+              {viewMode === 'my' ? 'No events created by you yet' : 'No events yet'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {viewMode === 'my'
+                ? 'Create an event to manage it here'
+                : 'Events will appear here once created'}
+            </Text>
           </View>
         ) : (
           <View style={styles.eventsList}>
-            {allEvents.map((event) => (
+            {visibleEvents.map((event) => (
               <TouchableOpacity
                 key={event.id}
                 style={styles.eventCard}
-                onPress={() => navigation.navigate('EventDetail', { event })}
+                onPress={() =>
+                  viewMode === 'my'
+                    ? navigation.navigate('ManageEvent', { event })
+                    : navigation.navigate('EventDetail', { event })
+                }
               >
                 <View style={styles.eventHeader}>
                   <View style={styles.eventInfo}>
@@ -49,13 +100,17 @@ export const EventsScreen: React.FC = () => {
                 <View style={styles.eventStats}>
                   <View style={styles.statItem}>
                     <Ionicons name="heart" size={16} color="#E372A1" />
-                    <Text style={styles.statText}>
-                      {event.interestedCount} interested
-                    </Text>
+                    <Text style={styles.statText}>{event.interestedCount} interested</Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Ionicons name="location" size={16} color="#6B7280" />
-                    <Text style={styles.statText}>{event.location}</Text>
+                    <Ionicons
+                      name={viewMode === 'my' ? 'settings-outline' : 'location'}
+                      size={16}
+                      color="#6B7280"
+                    />
+                    <Text style={styles.statText}>
+                      {viewMode === 'my' ? 'Tap to manage' : event.location}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -89,6 +144,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  switchWrap: {
+    paddingHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  switchTrack: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 4,
+  },
+  switchBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchBtnActive: {
+    backgroundColor: '#FFF5F8',
+  },
+  switchText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  switchTextActive: {
+    color: '#B06579',
+  },
   content: {
     flex: 1,
   },
@@ -104,6 +190,7 @@ const styles = StyleSheet.create({
     color: '#2D3436',
     marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,

@@ -84,15 +84,41 @@ export const CreateClubScreen: React.FC = () => {
   }, [clubs, currentUser?.id]);
   const [activeClubId, setActiveClubId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [optimisticInvitesByClub, setOptimisticInvitesByClub] = useState<Record<string, string[]>>({});
 
   // Potential members — load from backend API (same college only)
   const [potentialMembers, setPotentialMembers] = useState<User[]>([]);
+  const [isLoadingPotentialMembers, setIsLoadingPotentialMembers] = useState(false);
+  const [hasLoadedPotentialMembers, setHasLoadedPotentialMembers] = useState(false);
+
+  const mapProfileToUser = (p: any): User => ({
+    id: p.id,
+    name: p.name || 'Student',
+    email: p.email || '',
+    collegeId: p.college_id || '',
+    collegeName: p.college_name || '',
+    major: p.major || '',
+    year: p.year || 'Freshman',
+    semester: p.semester || '',
+    profilePhoto: (p.profile_photo || p.profilePhoto || p.avatar_url || p.avatarUrl || '').trim() || undefined,
+    interests: toStringArray(p.interests ?? p.interest_tags ?? p.interest_list),
+    clubsJoined: toStringArray(p.clubs_joined ?? p.clubsJoined),
+    clubsLeading: toStringArray(p.clubs_leading ?? p.clubsLeading),
+    eventsAttended: p.events_attended || 0,
+    rating: p.rating || 0,
+    totalTransactions: p.total_transactions || 0,
+  });
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setIsLoadingPotentialMembers(true);
+      setHasLoadedPotentialMembers(false);
       if (!isBackendConfigured()) {
         if (!currentUser?.id || !currentUser.collegeId) {
           setPotentialMembers([]);
+          setIsLoadingPotentialMembers(false);
+          setHasLoadedPotentialMembers(true);
           return;
         }
         try {
@@ -103,29 +129,31 @@ export const CreateClubScreen: React.FC = () => {
             .neq('id', currentUser.id)
             .order('name', { ascending: true });
           if (error) throw error;
-          const list = await Promise.all((data || []).map(async (p: any) => ({
-            id: p.id,
-            name: p.name || 'Student',
-            email: p.email || '',
-            collegeId: p.college_id || '',
-            collegeName: p.college_name || '',
-            major: p.major || '',
-            year: p.year || 'Freshman',
-            semester: p.semester || '',
-            profilePhoto: await resolveProfilePhotoUrl(
-              p.profile_photo || p.profilePhoto || p.avatar_url || p.avatarUrl
-            ),
-            interests: toStringArray(p.interests ?? p.interest_tags ?? p.interest_list),
-            clubsJoined: toStringArray(p.clubs_joined ?? p.clubsJoined),
-            clubsLeading: toStringArray(p.clubs_leading ?? p.clubsLeading),
-            eventsAttended: p.events_attended || 0,
-            rating: p.rating || 0,
-            totalTransactions: p.total_transactions || 0,
-          })) as Promise<User>[]);
-          setPotentialMembers(list);
+          const list = (data || []).map(mapProfileToUser);
+          if (!cancelled) setPotentialMembers(list);
+          // Resolve private-storage profile photos after cards are already visible.
+          void (async () => {
+            const resolvedList = await Promise.all(
+              list.map(async (member) => {
+                try {
+                  if (!member.profilePhoto) return member;
+                  const resolved = await resolveProfilePhotoUrl(member.profilePhoto);
+                  return resolved ? { ...member, profilePhoto: resolved } : member;
+                } catch {
+                  return member;
+                }
+              })
+            );
+            if (!cancelled) setPotentialMembers(resolvedList);
+          })();
         } catch (e) {
           console.warn('fetch same-college users (supabase fallback) error', e);
-          setPotentialMembers([]);
+          if (!cancelled) setPotentialMembers([]);
+        } finally {
+          if (!cancelled) {
+            setIsLoadingPotentialMembers(false);
+            setHasLoadedPotentialMembers(true);
+          }
         }
         return;
       }
@@ -139,35 +167,39 @@ export const CreateClubScreen: React.FC = () => {
           : [];
         
         if (data && Array.isArray(data)) {
-          // Map response to User type
-          const list = await Promise.all(data.map(async (p: any) => ({
-            id: p.id,
-            name: p.name || 'Student',
-            email: p.email || '',
-            collegeId: p.college_id || '',
-            collegeName: p.college_name || '',
-            major: p.major || '',
-            year: p.year || 'Freshman',
-            semester: p.semester || '',
-            profilePhoto: await resolveProfilePhotoUrl(
-              p.profile_photo || p.profilePhoto || p.avatar_url || p.avatarUrl
-            ),
-            interests: toStringArray(p.interests ?? p.interest_tags ?? p.interest_list),
-            clubsJoined: toStringArray(p.clubs_joined ?? p.clubsJoined),
-            clubsLeading: toStringArray(p.clubs_leading ?? p.clubsLeading),
-            eventsAttended: p.events_attended || 0,
-            rating: p.rating || 0,
-            totalTransactions: p.total_transactions || 0,
-          })) as Promise<User>[]);
-          setPotentialMembers(list);
+          const list = data.map(mapProfileToUser);
+          if (!cancelled) setPotentialMembers(list);
+          // Resolve private-storage profile photos after cards are already visible.
+          void (async () => {
+            const resolvedList = await Promise.all(
+              list.map(async (member) => {
+                try {
+                  if (!member.profilePhoto) return member;
+                  const resolved = await resolveProfilePhotoUrl(member.profilePhoto);
+                  return resolved ? { ...member, profilePhoto: resolved } : member;
+                } catch {
+                  return member;
+                }
+              })
+            );
+            if (!cancelled) setPotentialMembers(resolvedList);
+          })();
           return;
         }
       } catch (e) {
         console.warn('fetch same-college users error', e);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingPotentialMembers(false);
+          setHasLoadedPotentialMembers(true);
+        }
       }
       // Fallback: keep empty list
-      setPotentialMembers([]);
+      if (!cancelled) setPotentialMembers([]);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser?.id, currentUser?.collegeId]);
 
   const clubTypes: ClubType[] = ['Academic', 'Sports', 'Arts & Culture', 'Technology', 'Social', 'Custom'];
@@ -198,6 +230,16 @@ export const CreateClubScreen: React.FC = () => {
         .map((request) => request.userId)
     );
   }, [joinRequests, activeClubId]);
+
+  const optimisticInvitedMemberIds = useMemo(() => {
+    if (!activeClubId) return new Set<string>();
+    return new Set(optimisticInvitesByClub[activeClubId] || []);
+  }, [optimisticInvitesByClub, activeClubId]);
+
+  const effectiveInvitedMemberIds = useMemo(
+    () => new Set([...Array.from(invitedMemberIds), ...Array.from(optimisticInvitedMemberIds)]),
+    [invitedMemberIds, optimisticInvitedMemberIds]
+  );
 
   const filteredMembers = useMemo(() => {
     return potentialMembers.filter((member) => {
@@ -242,10 +284,16 @@ export const CreateClubScreen: React.FC = () => {
       setInviteFeedback(`${member.name} is already a member`);
       return;
     }
-    if (invitedMemberIds.has(member.id)) {
+    if (effectiveInvitedMemberIds.has(member.id)) {
       setInviteFeedback(`${member.name} already invited`);
       return;
     }
+    setOptimisticInvitesByClub((prev) => {
+      if (!activeClub) return prev;
+      const existing = prev[activeClub.id] || [];
+      if (existing.includes(member.id)) return prev;
+      return { ...prev, [activeClub.id]: [...existing, member.id] };
+    });
     createJoinRequest({
       id: `invite_${Date.now()}`,
       clubId: activeClub.id,
@@ -634,10 +682,27 @@ export const CreateClubScreen: React.FC = () => {
     setInviteFeedback(null);
   };
 
+  useEffect(() => {
+    const parent = navigation.getParent?.();
+    if (!parent) return;
+
+    const unsubscribe = parent.addListener('tabPress', (event: any) => {
+      if (!isSwipeMode) return;
+      const state = parent.getState?.();
+      const pressedRoute = state?.routes?.find((route: any) => route.key === event?.target);
+      if (pressedRoute?.name === 'Clubs') {
+        closeSwipeMode();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isSwipeMode]);
+
   const handleSwipeLeft = () => {
-    if (currentProfileIndex < filteredMembers.length - 1) {
-      setCurrentProfileIndex(currentProfileIndex + 1);
-    }
+    setCurrentProfileIndex((prev) => {
+      const next = prev + 1;
+      return next > filteredMembers.length ? filteredMembers.length : next;
+    });
   };
 
   const handleSwipeRight = () => {
@@ -645,9 +710,10 @@ export const CreateClubScreen: React.FC = () => {
     if (currentProfile) {
       handleInviteMember(currentProfile);
     }
-    if (currentProfileIndex < filteredMembers.length - 1) {
-      setCurrentProfileIndex(currentProfileIndex + 1);
-    }
+    setCurrentProfileIndex((prev) => {
+      const next = prev + 1;
+      return next > filteredMembers.length ? filteredMembers.length : next;
+    });
   };
 
   if (isSwipeMode) {
@@ -701,30 +767,17 @@ export const CreateClubScreen: React.FC = () => {
               <Text style={styles.inviteFeedbackText}>{inviteFeedback}</Text>
             </View>
           )}
-          {filteredMembers.length > 0 && currentProfileIndex >= filteredMembers.length && (
-            <TouchableOpacity
-              style={styles.reloadBanner}
-              onPress={() => setCurrentProfileIndex(0)}
-            >
-              <Ionicons name="refresh" size={16} color="#B06579" />
-              <Text style={styles.reloadButtonText}>Reload cards</Text>
-            </TouchableOpacity>
-          )}
           {/* filter temporarily hidden */}
         </View>
 
-        {currentProfileIndex >= filteredMembers.length && filteredMembers.length > 0 && (
-          <TouchableOpacity
-            style={styles.reloadButton}
-            onPress={() => setCurrentProfileIndex(0)}
-          >
-            <Ionicons name="refresh" size={16} color="#B06579" />
-            <Text style={styles.reloadButtonText}>Reload cards</Text>
-          </TouchableOpacity>
-        )}
-
         <View style={styles.swipeCardContainer}>
-          {filteredMembers.length === 0 ? (
+          {isLoadingPotentialMembers && !hasLoadedPotentialMembers ? (
+            <View style={styles.loadingSwipeState}>
+              <ActivityIndicator size="large" color="#E372A1" />
+              <Text style={styles.loadingSwipeTitle}>Loading members...</Text>
+              <Text style={styles.loadingSwipeSubtitle}>Fetching students from your college</Text>
+            </View>
+          ) : filteredMembers.length === 0 ? (
             <View style={styles.emptySwipeState}>
               <Ionicons name="search" size={36} color="#D1D5DB" />
               <Text style={styles.emptySwipeTitle}>No matches</Text>
@@ -737,32 +790,14 @@ export const CreateClubScreen: React.FC = () => {
               onSwipeRight={handleSwipeRight}
             />
           ) : (
-            <View style={styles.endCard}>
-              <LinearGradient
-                colors={['#E372A1', '#CE678A', '#B06579']}
-                style={styles.endCardIcon}
-              >
-                <Ionicons name="checkmark-circle" size={60} color="#fff" />
-              </LinearGradient>
-              <Text style={styles.endCardTitle}>All Done!</Text>
-              <Text style={styles.endCardSubtitle}>You've reviewed all potential members</Text>
+            <View style={styles.exhaustedState}>
+              <Text style={styles.exhaustedSubtitle}>Reload to review members again</Text>
               <TouchableOpacity
-                style={styles.reloadButton}
+                style={styles.smallRefreshButton}
                 onPress={() => setCurrentProfileIndex(0)}
               >
-                <Ionicons name="refresh" size={16} color="#B06579" />
-                <Text style={styles.reloadButtonText}>Reload cards</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.doneButton}
-                onPress={closeSwipeMode}
-              >
-                <LinearGradient
-                  colors={['#E372A1', '#CE678A', '#B06579']}
-                  style={styles.doneButtonGradient}
-                >
-                  <Text style={styles.doneButtonText}>Back to clubs</Text>
-                </LinearGradient>
+                <Ionicons name="refresh" size={14} color="#B06579" />
+                <Text style={styles.smallRefreshText}>Refresh</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1481,6 +1516,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
+  loadingSwipeState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    gap: 8,
+  },
+  loadingSwipeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  loadingSwipeSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
   emptySwipeState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1496,78 +1546,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
-  endCard: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  endCardIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  exhaustedState: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    padding: 20,
   },
-  endCardTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  endCardSubtitle: {
-    fontSize: 14,
+  exhaustedSubtitle: {
+    fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 32,
-    fontWeight: '500',
+    marginBottom: 8,
   },
-  reloadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  reloadBanner: {
+  smallRefreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF5F8',
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#F4C8D8',
+    backgroundColor: '#FFF5F8',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
-  reloadButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  doneButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#E372A1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  doneButtonGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-  },
-  doneButtonText: {
-    fontSize: 16,
+  smallRefreshText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#fff',
+    color: '#B06579',
   },
 });

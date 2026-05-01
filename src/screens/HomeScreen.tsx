@@ -428,7 +428,14 @@ export const HomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
             <View style={styles.eventsActionsRow}>
               {events.length > 4 && (
-                <TouchableOpacity onPress={() => navigation.navigate('Events')}>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('Events', {
+                      screen: 'EventsList',
+                      params: { initialView: 'all' },
+                    })
+                  }
+                >
                   <Text style={styles.seeMoreText}>See More</Text>
                 </TouchableOpacity>
               )}

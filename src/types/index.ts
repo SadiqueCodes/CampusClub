@@ -47,6 +47,8 @@ export interface Event {
   bannerImage?: string;
   interestedUserIds: string[];
   interestedCount: number;
+  registeredUserIds: string[];
+  registeredCount: number;
   createdBy: string;
 }
 

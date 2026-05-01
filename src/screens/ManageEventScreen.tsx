@@ -13,7 +13,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -26,16 +26,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const ManageEventScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const event: Event = route.params?.event;
-  const { currentUser } = useStore();
+  const eventParam: Event = route.params?.event;
+  const { currentUser, events, fetchEvents } = useStore();
+  const event = events.find((e) => e.id === eventParam?.id) || eventParam;
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editedLocation, setEditedLocation] = useState(event.location);
+  const [editedLocation, setEditedLocation] = useState(event?.location || '');
   const [editedCapacity, setEditedCapacity] = useState('50');
-  const [editedDate, setEditedDate] = useState(new Date(event.date));
+  const [editedDate, setEditedDate] = useState(new Date(event?.date || new Date()));
   const [editedTime, setEditedTime] = useState(() => {
     // Parse the time string from event
-    const [time, period] = event.time.split(' ');
+    const [time, period] = (event?.time || '12:00 PM').split(' ');
     const [hours, minutes] = time.split(':');
     let hour = parseInt(hours);
     if (period === 'PM' && hour !== 12) hour += 12;
@@ -53,13 +54,32 @@ export const ManageEventScreen: React.FC = () => {
 
   const [registeredUsers, setRegisteredUsers] = useState<User[]>([]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      const load = async () => {
+        try {
+          await fetchEvents();
+        } catch (e) {
+          if (active) console.warn('ManageEvent fetchEvents error', e);
+        }
+      };
+      load();
+      const interval = setInterval(load, 4000);
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }, [fetchEvents])
+  );
+
   useEffect(() => {
     (async () => {
       try {
-        // Try to load profiles for interested users if available
-        const interestedIds = (event as any)?.interestedUserIds || [];
-        if (interestedIds && interestedIds.length) {
-          const { data, error } = await supabase.from('profiles').select('*').in('id', interestedIds as string[]).limit(50);
+        // Load profiles for registered users if available
+        const registeredIds = (event as any)?.registeredUserIds || [];
+        if (registeredIds && registeredIds.length) {
+          const { data, error } = await supabase.from('profiles').select('*').in('id', registeredIds as string[]).limit(50);
           if (!error && data) {
             const mapped = (data as any[]).map((p) => ({ id: p.id, name: p.name, major: p.major || '', year: p.year || 'Freshman', profilePhoto: p.profile_photo || '' } as User));
             setRegisteredUsers(mapped);
@@ -72,7 +92,7 @@ export const ManageEventScreen: React.FC = () => {
       // Fallback: empty list when no attendee profiles are available
       setRegisteredUsers([]);
     })();
-  }, [event]);
+  }, [event?.id, event?.registeredCount, JSON.stringify((event as any)?.registeredUserIds || [])]);
 
   const handleSaveChanges = () => {
     // Update the event in the store
@@ -155,7 +175,7 @@ export const ManageEventScreen: React.FC = () => {
               <View style={styles.statIconContainer}>
                 <Ionicons name="checkmark-circle" size={28} color="#10B981" />
               </View>
-              <Text style={styles.statValue}>{registeredUsers.length}</Text>
+              <Text style={styles.statValue}>{Math.max(registeredUsers.length, event.registeredCount || 0)}</Text>
               <Text style={styles.statLabel}>Registered</Text>
             </View>
 

@@ -203,6 +203,29 @@ export async function createEvent(payload: {
   return res.json();
 }
 
+export async function updateEventInteraction(eventId: string, kind: 'interested' | 'registered') {
+  if (!BACKEND_URL) {
+    throw new Error('Backend URL not configured.');
+  }
+  const sessionRes = await supabase.auth.getSession();
+  const token = (sessionRes as any)?.data?.session?.access_token;
+
+  const res = await fetch(`${BACKEND_URL.replace(/\/$/, '')}/api/events/${eventId}/interaction`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ kind }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to update event interaction: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
 export async function respondJoinRequest(requestId: string, decision: 'accepted' | 'rejected') {
   if (!BACKEND_URL) {
     throw new Error('Backend URL not configured.');
@@ -366,4 +389,4 @@ export async function del(endpoint: string) {
   return res.json();
 }
 
-export default { postMessage, createClub, createChat, createEvent, updateClub, leaveClub, respondJoinRequest, searchGifs, get, post, put, patch, del };
+export default { postMessage, createClub, createChat, createEvent, updateEventInteraction, updateClub, leaveClub, respondJoinRequest, searchGifs, get, post, put, patch, del };

@@ -14,3 +14,4 @@ export { ProfileScreen } from './ProfileScreen';
 export { SearchClubsScreen } from './SearchClubsScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { NotificationsScreen } from './NotificationsScreen';
+export { RegisteredEventsScreen } from './RegisteredEventsScreen';

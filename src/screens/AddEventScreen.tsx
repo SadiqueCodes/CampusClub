@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,13 @@ export const AddEventScreen: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [showClubSelector, setShowClubSelector] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatusText, setSaveStatusText] = useState('');
   const allowProgrammaticLeaveRef = useRef(false);
+  const adminClubs = useMemo(() => {
+    const myId = currentUser?.id;
+    if (!myId) return [] as Club[];
+    return clubs.filter((club) => club.leaderId === myId);
+  }, [clubs, currentUser?.id]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
@@ -48,12 +54,20 @@ export const AddEventScreen: React.FC = () => {
     return unsubscribe;
   }, [navigation, isSaving]);
 
+  useEffect(() => {
+    if (!selectedClub) return;
+    const stillAdminOfSelected = adminClubs.some((club) => club.id === selectedClub.id);
+    if (!stillAdminOfSelected) {
+      setSelectedClub(null);
+    }
+  }, [adminClubs, selectedClub]);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 0.65,
+      quality: 0.45,
     });
 
     if (!result.canceled) {
@@ -70,6 +84,10 @@ export const AddEventScreen: React.FC = () => {
       Alert.alert('Select a club', 'Choose which club is hosting this event.');
       return;
     }
+    if (!adminClubs.some((club) => club.id === selectedClub.id)) {
+      Alert.alert('Admin required', 'You can only create events for clubs where you are the admin.');
+      return;
+    }
     if (!currentUser) {
       Alert.alert('Not signed in', 'You must be logged in to create an event.');
       return;
@@ -82,6 +100,7 @@ export const AddEventScreen: React.FC = () => {
     });
 
     setIsSaving(true);
+    setSaveStatusText(posterImage ? 'Creating event' : 'Creating event...');
     allowProgrammaticLeaveRef.current = false;
     try {
       await createEvent({
@@ -106,6 +125,7 @@ export const AddEventScreen: React.FC = () => {
       }
     } finally {
       setIsSaving(false);
+      setSaveStatusText('');
       allowProgrammaticLeaveRef.current = false;
     }
   };
@@ -186,10 +206,15 @@ export const AddEventScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.selectorButton}
             onPress={() => setShowClubSelector(true)}
+            disabled={adminClubs.length === 0}
           >
             <Ionicons name="people-outline" size={20} color="#B06579" />
             <Text style={[styles.selectorText, !selectedClub && styles.placeholderText]}>
-              {selectedClub ? selectedClub.name : 'Select a club'}
+              {selectedClub
+                ? selectedClub.name
+                : adminClubs.length > 0
+                ? 'Select a club'
+                : 'No admin clubs available'}
             </Text>
             <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
           </TouchableOpacity>
@@ -297,9 +322,12 @@ export const AddEventScreen: React.FC = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={styles.createButtonText}>{isSaving ? 'Creating...' : 'Create Event'}</Text>
+            <Text style={styles.createButtonText}>{isSaving ? saveStatusText || 'Creating...' : 'Create Event'}</Text>
           </LinearGradient>
         </TouchableOpacity>
+        {!!posterImage && !isSaving && (
+          <Text style={styles.posterHint}>Tip: poster uploads may take longer on slow network.</Text>
+        )}
       </ScrollView>
 
       {/* Club Selector Modal */}
@@ -323,7 +351,7 @@ export const AddEventScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.clubList}>
-              {clubs.map((club) => (
+              {adminClubs.map((club) => (
                 <TouchableOpacity
                   key={club.id}
                   style={styles.clubOption}
@@ -346,6 +374,11 @@ export const AddEventScreen: React.FC = () => {
                   )}
                 </TouchableOpacity>
               ))}
+              {adminClubs.length === 0 && (
+                <View style={styles.emptyClubState}>
+                  <Text style={styles.emptyClubStateText}>No clubs where you are admin.</Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -495,10 +528,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   createButtonText: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     color: '#fff',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+  posterHint: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   selectorButton: {
     backgroundColor: '#fff',
@@ -584,5 +625,14 @@ const styles = StyleSheet.create({
   clubOptionType: {
     fontSize: 13,
     color: '#9CA3AF',
+  },
+  emptyClubState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyClubStateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });

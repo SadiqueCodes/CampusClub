@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { emitInAppAlert } from './inAppAlerts';
 
 export const notifiedJoinRequestIds = new Set<string>();
 
@@ -7,5 +7,5 @@ export const notifyJoinRequest = (title: string, message: string, requestId?: st
   if (requestId) {
     notifiedJoinRequestIds.add(requestId);
   }
-  Alert.alert(title, message, [{ text: 'OK' }], { cancelable: true });
+  emitInAppAlert({ title, message });
 };

@@ -14,6 +14,7 @@ import { CreateClubScreen } from '../screens/CreateClubScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { RegisteredEventsScreen } from '../screens/RegisteredEventsScreen';
 import { SearchClubsScreen } from '../screens/SearchClubsScreen';
 import { theme } from '../theme';
 import { MarketplaceScreen } from '../screens/MarketplaceScreen';
@@ -30,6 +31,7 @@ const ProfileStackNavigator: React.FC = () => {
     <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
       <ProfileStack.Screen name="ProfileSettings" component={SettingsScreen} />
+      <ProfileStack.Screen name="RegisteredEvents" component={RegisteredEventsScreen} />
     </ProfileStack.Navigator>
   );
 };
@@ -118,6 +120,23 @@ export const TabNavigator: React.FC = () => {
       <Tab.Screen
         name="Events"
         component={EventsStackNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const tabState = navigation.getState() as any;
+            const activeTabName = tabState?.routes?.[tabState?.index ?? 0]?.name;
+            // If user is already inside Events tab, avoid forced re-navigate
+            // so double taps do not replay stale nested routes like ManageEvent.
+            if (activeTabName === 'Events') {
+              return;
+            }
+
+            e.preventDefault();
+            navigation.navigate('Events', {
+              screen: 'EventsList',
+              params: { initialView: 'my' },
+            });
+          },
+        })}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
@@ -131,6 +150,24 @@ export const TabNavigator: React.FC = () => {
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const tabState = navigation.getState() as any;
+            const activeTabName = tabState?.routes?.[tabState?.index ?? 0]?.name;
+            const homeRoute = tabState?.routes?.find((route: any) => route.name === 'Home');
+            const homeStackState = homeRoute?.state as any;
+            const activeHomeScreen =
+              homeStackState?.routes?.[homeStackState?.index ?? 0]?.name || 'HomeMain';
+
+            // Avoid forced re-navigation when already on HomeMain (prevents visual jitter).
+            if (activeTabName === 'Home' && activeHomeScreen === 'HomeMain') {
+              return;
+            }
+
+            e.preventDefault();
+            navigation.navigate('Home', { screen: 'HomeMain' });
+          },
+        })}
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={styles.centerTabContainer}>

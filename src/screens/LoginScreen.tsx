@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated, Alert, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, KeyboardAvoidingView, Platform, Animated, Alert, Modal, FlatList, ActivityIndicator, Keyboard, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 import { Lobster_400Regular } from '@expo-google-fonts/lobster';
+import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../theme';
 import { useStore } from '../store';
 import { User } from '../types';
 import supabase from '../lib/supabase';
+import { uploadImageToSupabase } from '../lib/storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const yearOptions: Array<{ value: User['year']; label: string }> = [
@@ -108,6 +110,8 @@ export const LoginScreen: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [keyboardLift, setKeyboardLift] = useState(0);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [signUpStep, setSignUpStep] = useState(1);
   const totalSignUpSteps = 3;
   const [collegeName, setCollegeName] = useState('');
@@ -116,6 +120,7 @@ export const LoginScreen: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<User['year'] | ''>('');
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [profilePhotoUri, setProfilePhotoUri] = useState('');
 
   // College dropdown state
   const [colleges, setColleges] = useState<Array<{ id: number; name: string; state: string }>>([]);
@@ -132,6 +137,8 @@ export const LoginScreen: React.FC = () => {
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
   const scrollX = useRef(new Animated.Value(0)).current;
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     // Seamless infinite scroll animation
@@ -160,6 +167,31 @@ export const LoginScreen: React.FC = () => {
       scrollAnimation.stop();
     };
   }, [scrollX]);
+
+  useEffect(() => {
+    const onShow = (event: any) => {
+      const keyboardHeight = event?.endCoordinates?.height || 0;
+      const lift = Math.min(180, keyboardHeight * 0.5);
+      setKeyboardLift(lift);
+      setIsKeyboardOpen(true);
+    };
+
+    const onHide = () => {
+      setKeyboardLift(0);
+      setIsKeyboardOpen(false);
+    };
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Fetch colleges from Supabase
   useEffect(() => {
@@ -229,6 +261,7 @@ export const LoginScreen: React.FC = () => {
     setSelectedYear('');
     setSelectedSemester('');
     setSelectedInterests([]);
+    setProfilePhotoUri('');
     setCollegeSearchQuery('');
     setMajorSearchQuery('');
   };
@@ -342,6 +375,12 @@ export const LoginScreen: React.FC = () => {
     if (!validateSignUpStep()) return;
     setLoading(true);
     try {
+      let uploadedProfilePhoto = '';
+      if (profilePhotoUri) {
+        uploadedProfilePhoto = /^https?:\/\//i.test(profilePhotoUri)
+          ? profilePhotoUri
+          : await uploadImageToSupabase(profilePhotoUri, `profile-photos/${Date.now()}`);
+      }
       await signUp({
         name,
         email,
@@ -351,6 +390,7 @@ export const LoginScreen: React.FC = () => {
         major: major || 'Undeclared',
         year: (selectedYear as User['year']) || 'Freshman',
         semester: selectedSemester || '1',
+        profilePhoto: uploadedProfilePhoto || undefined,
         interests: selectedInterests.length ? selectedInterests : ['Campus Life'],
       });
       resetSignUpForm();
@@ -405,6 +445,35 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+    setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 30);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword((prev) => !prev);
+    setTimeout(() => {
+      confirmPasswordInputRef.current?.focus();
+    }, 30);
+  };
+
+  const handlePickProfilePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setProfilePhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Upload failed', 'Could not select profile image right now.');
+    }
+  };
+
   const handleToggleAuthMode = () => {
     if (isSignUp) {
       resetSignUpForm();
@@ -436,14 +505,20 @@ export const LoginScreen: React.FC = () => {
         <View style={styles.inputWrapper}>
           <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
           <TextInput
+            ref={passwordInputRef}
             style={styles.input}
             placeholder="Enter your password"
             placeholderTextColor="#DDD"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            blurOnSubmit={false}
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+          <TouchableOpacity
+            onPressIn={() => passwordInputRef.current?.focus()}
+            onPress={togglePasswordVisibility}
+            style={styles.eyeIcon}
+          >
             <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
           </TouchableOpacity>
         </View>
@@ -545,14 +620,20 @@ export const LoginScreen: React.FC = () => {
               <View style={styles.inputWrapper}>
                 <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
                 <TextInput
+                  ref={passwordInputRef}
                   style={styles.input}
                   placeholder="Create a password"
                   placeholderTextColor="#DDD"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  blurOnSubmit={false}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <TouchableOpacity
+                  onPressIn={() => passwordInputRef.current?.focus()}
+                  onPress={togglePasswordVisibility}
+                  style={styles.eyeIcon}
+                >
                   <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
                 </TouchableOpacity>
               </View>
@@ -563,14 +644,20 @@ export const LoginScreen: React.FC = () => {
               <View style={styles.inputWrapper}>
                 <Ionicons name="lock-closed-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
                 <TextInput
+                  ref={confirmPasswordInputRef}
                   style={styles.input}
                   placeholder="Confirm password"
                   placeholderTextColor="#DDD"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
+                  blurOnSubmit={false}
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                <TouchableOpacity
+                  onPressIn={() => confirmPasswordInputRef.current?.focus()}
+                  onPress={toggleConfirmPasswordVisibility}
+                  style={styles.eyeIcon}
+                >
                   <Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#B2BEB5" />
                 </TouchableOpacity>
               </View>
@@ -678,6 +765,26 @@ export const LoginScreen: React.FC = () => {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+            <View style={styles.uploadWrap}>
+              <Text style={styles.label}>Profile Image (Optional)</Text>
+              <View style={styles.uploadRow}>
+                {profilePhotoUri ? (
+                  <Image source={{ uri: profilePhotoUri }} style={styles.uploadPreview} />
+                ) : (
+                  <View style={styles.uploadPlaceholder}>
+                    <Ionicons name="person-outline" size={24} color="#9CA3AF" />
+                  </View>
+                )}
+                <View style={styles.uploadActions}>
+                  <TouchableOpacity style={styles.uploadButton} onPress={handlePickProfilePhoto}>
+                    <Ionicons name="cloud-upload-outline" size={16} color="#B06579" />
+                    <Text style={styles.uploadButtonText}>
+                      {profilePhotoUri ? 'Change image' : 'Upload image'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </>
         );
@@ -1128,7 +1235,7 @@ colors={['#B06579', '#CE678A', '#E372A1']}
       )}
 
       {/* Animated White Curved Section */}
-      <Animated.View style={[styles.whiteSection, { top: curvePosition }]}>
+      <Animated.View style={[styles.whiteSection, { top: curvePosition, transform: [{ translateY: -keyboardLift }] }]}>
         <Svg width={SCREEN_WIDTH} height={100} style={styles.curve}>
           <Path
             d={`M0,50 Q${SCREEN_WIDTH * 0.25},0 ${SCREEN_WIDTH * 0.5},50 Q${SCREEN_WIDTH * 0.75},90 ${SCREEN_WIDTH},50 L${SCREEN_WIDTH},100 L0,100 Z`}
@@ -1143,8 +1250,9 @@ colors={['#B06579', '#CE678A', '#E372A1']}
         </Svg>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior="padding"
           style={styles.contentContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 12}
         >
           {showWelcome ? (
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -1170,7 +1278,9 @@ colors={['#B06579', '#CE678A', '#E372A1']}
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 style={styles.formScroll}
-                contentContainerStyle={styles.formScrollContent}
+                contentContainerStyle={[styles.formScrollContent, { paddingBottom: isKeyboardOpen ? 140 : 80 }]}
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="none"
               >
                 {isSignUp ? (
                   <>
@@ -1592,6 +1702,49 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: '#fff',
+  },
+  uploadWrap: {
+    marginTop: 18,
+  },
+  uploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  uploadPreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
+  },
+  uploadPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadActions: {
+    flex: 1,
+    gap: 8,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#F0D3DE',
+    backgroundColor: '#FFF5F8',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  uploadButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B06579',
   },
   optionsRow: {
     flexDirection: 'row',

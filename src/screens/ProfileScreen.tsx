@@ -37,6 +37,12 @@ export const ProfileScreen: React.FC = () => {
   const attendedFromEvents = events.filter((event) =>
     (event.interestedUserIds || []).includes(currentUser?.id || '')
   ).length;
+  const registeredEvents = useMemo(() => {
+    const myId = currentUser?.id || '';
+    return [...events]
+      .filter((event) => (event.registeredUserIds || []).includes(myId))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [events, currentUser?.id]);
   const profileEventCount = Math.max(
     Number(currentUser?.eventsAttended || 0),
     attendedFromEvents
@@ -163,6 +169,43 @@ export const ProfileScreen: React.FC = () => {
                     <Text style={styles.leaderBadgeText}>Lead</Text>
                   </View>
                 )}
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionCardHeader}>
+            <Text style={styles.sectionTitle}>Registered Events</Text>
+            {registeredEvents.length > 4 && (
+              <TouchableOpacity onPress={() => navigation.navigate('RegisteredEvents')}>
+                <Text style={styles.sectionAction}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {registeredEvents.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={36} color="#D1D5DB" />
+              <Text style={styles.emptyText}>You have not registered for events yet</Text>
+            </View>
+          ) : (
+            registeredEvents.slice(0, 4).map((event) => (
+              <TouchableOpacity
+                key={event.id}
+                style={styles.clubRow}
+                onPress={() =>
+                  navigation.navigate('Events', {
+                    screen: 'EventDetail',
+                    params: { event },
+                  })
+                }
+              >
+                <View>
+                  <Text style={styles.clubName}>{event.title}</Text>
+                  <Text style={styles.clubType}>
+                    {event.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {event.time}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ))
           )}

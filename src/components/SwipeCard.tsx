@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, ActivityIndicator } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -29,12 +29,15 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
 
   // Reset position when user changes
   useEffect(() => {
     translateX.value = 0;
     translateY.value = 0;
     setImageFailed(false);
+    const raw = (user.profilePhoto || '').trim();
+    setImageLoading(!!raw);
   }, [user.id]);
 
   const panGesture = Gesture.Pan()
@@ -82,6 +85,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
   });
 
   const topInterests = user.interests.slice(0, 3);
+  const visibleInterests = topInterests.slice(0, 2);
+  const extraInterestCount = Math.max(0, (user.interests || []).length - visibleInterests.length);
   const yearShort =
     user.year === 'Freshman' ? '1st' : user.year === 'Sophomore' ? '2nd' : user.year === 'Junior' ? '3rd' : '4th';
   const resolvedProfilePhoto = (() => {
@@ -105,11 +110,26 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
           >
             <View style={styles.avatarCircle}>
               {resolvedProfilePhoto && !imageFailed ? (
-                <Image
-                  source={{ uri: resolvedProfilePhoto }}
-                  style={styles.avatarImage}
-                  onError={() => setImageFailed(true)}
-                />
+                <>
+                  <Image
+                    source={{ uri: resolvedProfilePhoto }}
+                    style={[styles.avatarImage, imageLoading && styles.avatarImageHidden]}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoadEnd={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageFailed(true);
+                      setImageLoading(false);
+                    }}
+                  />
+                  {imageLoading && (
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0.25)']}
+                      style={styles.imageLoadingGlaze}
+                    >
+                      <ActivityIndicator size="small" color="#B06579" />
+                    </LinearGradient>
+                  )}
+                </>
               ) : (
                 <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
               )}
@@ -140,16 +160,27 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ user, onSwipeLeft, onSwipe
 
             <View style={styles.infoRow}>
               <Ionicons name="school" size={16} color="#B06579" />
-              <Text style={styles.major}>{user.major}</Text>
+              <Text style={styles.major} numberOfLines={1}>
+                {user.major}
+              </Text>
             </View>
 
             <View style={styles.tagRow}>
-              {topInterests.length > 0 ? (
-                topInterests.map((interest) => (
-                  <View key={interest} style={styles.tagChip}>
-                    <Text style={styles.tagChipText}>{interest}</Text>
-                  </View>
-                ))
+              {visibleInterests.length > 0 ? (
+                <>
+                  {visibleInterests.map((interest) => (
+                    <View key={interest} style={styles.tagChip}>
+                      <Text style={styles.tagChipText} numberOfLines={1}>
+                        {interest}
+                      </Text>
+                    </View>
+                  ))}
+                  {extraInterestCount > 0 && (
+                    <View style={styles.tagChip}>
+                      <Text style={styles.tagChipText}>+{extraInterestCount}</Text>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.tagChip}>
                   <Text style={styles.tagChipText}>No interests yet</Text>
@@ -217,6 +248,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  avatarImageHidden: {
+    opacity: 0,
+  },
+  imageLoadingGlaze: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarText: {
     fontSize: 36,
     fontWeight: '800',
@@ -224,6 +263,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     padding: 16,
+    flex: 1,
   },
   nameRow: {
     flexDirection: 'row',
@@ -258,6 +298,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#6B7280',
     fontWeight: '600',
+    flex: 1,
   },
   bioText: {
     fontSize: 13,
@@ -266,23 +307,27 @@ const styles = StyleSheet.create({
   },
   tagRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    flexWrap: 'nowrap',
+    gap: 6,
+    marginBottom: 8,
+    minHeight: 28,
+    overflow: 'hidden',
   },
   tagChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
     backgroundColor: '#FFF5F8',
+    maxWidth: 120,
   },
   tagChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#B06579',
   },
   statsBlock: {
     gap: 8,
+    marginTop: 'auto',
   },
   statsRow: {
     flexDirection: 'row',

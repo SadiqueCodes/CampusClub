@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,49 @@ export const NotificationsScreen: React.FC = () => {
   const fetchClubs = useStore((state) => state.fetchClubs);
   const fetchJoinRequests = useStore((state) => state.fetchJoinRequests);
   const myId = currentUser?.id || '';
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, JoinRequest['status']>>({});
+  const [processingRequestIds, setProcessingRequestIds] = useState<Record<string, boolean>>({});
+  const [activeSection, setActiveSection] = useState<'invites' | 'applications' | 'incoming' | 'sent'>('invites');
+
+  useEffect(() => {
+    // Drop optimistic overrides once store has caught up.
+    setStatusOverrides((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(prev).forEach((requestId) => {
+        const latest = joinRequests.find((r) => r.id === requestId);
+        if (!latest || latest.status === prev[requestId]) {
+          delete next[requestId];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [joinRequests]);
+
+  const getEffectiveStatus = (request: JoinRequest): JoinRequest['status'] =>
+    statusOverrides[request.id] || request.status;
+
+  const runRequestAction = async (
+    request: JoinRequest,
+    optimisticStatus: JoinRequest['status'],
+    action: () => Promise<void>
+  ) => {
+    if (processingRequestIds[request.id]) return;
+    const previousStatus = getEffectiveStatus(request);
+
+    setProcessingRequestIds((prev) => ({ ...prev, [request.id]: true }));
+    setStatusOverrides((prev) => ({ ...prev, [request.id]: optimisticStatus }));
+
+    try {
+      await action();
+    } catch (err) {
+      setStatusOverrides((prev) => ({ ...prev, [request.id]: previousStatus }));
+      throw err;
+    } finally {
+      setProcessingRequestIds((prev) => ({ ...prev, [request.id]: false }));
+    }
+  };
 
   const myApplications = useMemo(
     () => joinRequests.filter((request) => request.userId === myId && request.initiatedBy === 'user'),
@@ -96,6 +139,7 @@ export const NotificationsScreen: React.FC = () => {
   };
 
   const handleApplicationDecision = async (request: JoinRequest, decision: 'accepted' | 'rejected') => {
+    await runRequestAction(request, decision, async () => {
     if (isBackendConfigured()) {
       try {
         await api.respondJoinRequest(request.id, decision);
@@ -115,12 +159,14 @@ export const NotificationsScreen: React.FC = () => {
       }
     }
     await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
+    });
   };
 
   const handleInvitationDecision = async (
     request: JoinRequest,
     decision: 'accepted' | 'rejected'
   ) => {
+    await runRequestAction(request, decision, async () => {
     if (isBackendConfigured()) {
       try {
         await api.respondJoinRequest(request.id, decision);
@@ -141,18 +187,23 @@ export const NotificationsScreen: React.FC = () => {
       }
     }
     await updateJoinRequest(request.id, { status: decision, respondedAt: new Date() });
+    });
   };
 
   const handleCancelRequest = async (request: JoinRequest) => {
-    await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+    await runRequestAction(request, 'cancelled', async () => {
+      await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+    });
   };
 
   const handleCancelInvite = async (request: JoinRequest) => {
-    await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+    await runRequestAction(request, 'cancelled', async () => {
+      await updateJoinRequest(request.id, { status: 'cancelled', respondedAt: new Date() });
+    });
   };
 
   const renderStatusBadge = (request: JoinRequest) => {
-    const statusMeta = requestStatusMeta[request.status];
+    const statusMeta = requestStatusMeta[getEffectiveStatus(request)];
     return (
       <View style={[styles.statusBadge, { backgroundColor: statusMeta.background }]}>
         <Text style={[styles.statusBadgeText, { color: statusMeta.color }]}>
@@ -165,42 +216,86 @@ export const NotificationsScreen: React.FC = () => {
   const renderEmptyState = (text: string) => (
     <Text style={styles.emptySectionText}>{text}</Text>
   );
+  const renderSectionHeader = (icon: any, title: string, count: number) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderLeft}>
+        <View style={styles.sectionIconBadge}>
+          <Ionicons name={icon} size={16} color="#6B7280" />
+        </View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      <View style={styles.sectionCountBadge}>
+        <Text style={styles.sectionCountText}>{count}</Text>
+      </View>
+    </View>
+  );
 
-  const pendingInvitesForMe = receivedInvitations.filter((request) => request.status === 'pending');
-  const pendingApplications = myApplications.filter((request) => request.status === 'pending');
-  const pendingIncoming = incomingRequests.filter((request) => request.status === 'pending');
-  const pendingSentInvites = sentInvites.filter((request) => request.status === 'pending');
+  const pendingInvitesForMe = receivedInvitations.filter((request) => getEffectiveStatus(request) === 'pending');
+  const pendingApplications = myApplications.filter((request) => getEffectiveStatus(request) === 'pending');
+  const pendingIncoming = incomingRequests.filter((request) => getEffectiveStatus(request) === 'pending');
+  const pendingSentInvites = sentInvites.filter((request) => getEffectiveStatus(request) === 'pending');
 
-  const summaryTiles = [
-    {
-      key: 'invitationsForMe',
-      title: 'Invites for you',
-      count: pendingInvitesForMe.length,
-      icon: 'mail-unread',
-      colors: ['#F9637C', '#F78DA7'],
-    },
-    {
-      key: 'myApplications',
-      title: 'My applications',
-      count: pendingApplications.length,
-      icon: 'paper-plane',
-      colors: ['#8E54E9', '#4776E6'],
-    },
-    {
-      key: 'incoming',
-      title: 'Incoming requests',
-      count: pendingIncoming.length,
-      icon: 'people-circle',
-      colors: ['#0BA360', '#3CBA92'],
-    },
-    {
-      key: 'sent',
-      title: 'Invites you sent',
-      count: pendingSentInvites.length,
-      icon: 'send',
-      colors: ['#F7971E', '#FFD200'],
-    },
-  ];
+  const summaryTiles = useMemo(
+    () =>
+      [
+        {
+          key: 'invitationsForMe',
+          title: 'Invites for you',
+          count: pendingInvitesForMe.length,
+          icon: 'mail-unread',
+          color: '#B06579',
+        },
+        {
+          key: 'myApplications',
+          title: 'My applications',
+          count: pendingApplications.length,
+          icon: 'paper-plane',
+          color: '#4B5563',
+        },
+        {
+          key: 'incoming',
+          title: 'Incoming requests',
+          count: pendingIncoming.length,
+          icon: 'people-circle',
+          color: '#047857',
+        },
+        {
+          key: 'sent',
+          title: 'Invites you sent',
+          count: pendingSentInvites.length,
+          icon: 'send',
+          color: '#C2410C',
+        },
+      ].sort((a, b) => {
+        const aHas = a.count > 0 ? 1 : 0;
+        const bHas = b.count > 0 ? 1 : 0;
+        if (aHas !== bHas) return bHas - aHas;
+        return b.count - a.count;
+      }),
+    [pendingInvitesForMe.length, pendingApplications.length, pendingIncoming.length, pendingSentInvites.length]
+  );
+  useEffect(() => {
+    if (!summaryTiles.length) return;
+    const first = summaryTiles[0].key;
+    const mapped =
+      first === 'invitationsForMe'
+        ? 'invites'
+        : first === 'myApplications'
+        ? 'applications'
+        : first === 'incoming'
+        ? 'incoming'
+        : 'sent';
+    setActiveSection(mapped);
+  }, [summaryTiles]);
+
+  const activeSectionMeta =
+    activeSection === 'invites'
+      ? { icon: 'gift-outline', title: 'Invitations for you', count: pendingInvitesForMe.length }
+      : activeSection === 'applications'
+      ? { icon: 'paper-plane-outline', title: 'My applications', count: pendingApplications.length }
+      : activeSection === 'incoming'
+      ? { icon: 'shield-checkmark-outline', title: 'Incoming requests (your clubs)', count: pendingIncoming.length }
+      : { icon: 'sparkles-outline', title: 'Invites you sent', count: pendingSentInvites.length };
 
   return (
     <View style={styles.container}>
@@ -210,48 +305,57 @@ export const NotificationsScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerTitle}>Activity Center</Text>
-            <Text style={styles.headerSubtitle}>Manage every club invite and request</Text>
+            <Text style={styles.headerTitle}>Notifications</Text>
+            <Text style={styles.headerSubtitle}>Club invites and requests</Text>
           </View>
         </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.summaryScroll}>
-          {summaryTiles.map((tile, index) => (
-            <LinearGradient
-              key={tile.key}
-              colors={tile.colors as any}
-              style={[
-                styles.summaryTile,
-                { marginRight: index === summaryTiles.length - 1 ? 0 : 12 },
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.summaryTileHeader}>
-                <Ionicons name={tile.icon as any} size={18} color="#fff" />
-                <Text style={styles.summaryTileLabel}>{tile.title}</Text>
-              </View>
-              <Text style={styles.summaryTileCount}>{tile.count}</Text>
-              <Text style={styles.summaryTileHint}>
-                {tile.count === 1 ? 'item pending' : 'items pending'}
-              </Text>
-            </LinearGradient>
-          ))}
-        </ScrollView>
+        <View style={styles.summaryRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.summaryScroll}>
+            {summaryTiles.map((tile, index) => (
+              <TouchableOpacity
+                key={tile.key}
+                onPress={() =>
+                  setActiveSection(
+                    tile.key === 'invitationsForMe'
+                      ? 'invites'
+                      : tile.key === 'myApplications'
+                      ? 'applications'
+                      : tile.key === 'incoming'
+                      ? 'incoming'
+                      : 'sent'
+                  )
+                }
+                style={[
+                  styles.summaryTile,
+                  { marginRight: index === summaryTiles.length - 1 ? 0 : 10 },
+                  ((tile.key === 'invitationsForMe' && activeSection === 'invites') ||
+                    (tile.key === 'myApplications' && activeSection === 'applications') ||
+                    (tile.key === 'incoming' && activeSection === 'incoming') ||
+                    (tile.key === 'sent' && activeSection === 'sent')) &&
+                    styles.summaryTileActive,
+                ]}
+              >
+                <View style={styles.summaryTileHeader}>
+                  <Ionicons name={tile.icon as any} size={16} color={tile.color as string} />
+                  <Text style={styles.summaryTileLabel}>{tile.title}</Text>
+                </View>
+                <Text style={styles.summaryTileCount}>{tile.count}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionIconBadge}>
-              <Ionicons name="gift-outline" size={16} color="#B06579" />
-            </View>
-            <Text style={styles.sectionTitle}>Invitations for you</Text>
-          </View>
-          {receivedInvitations.length === 0 ? (
+          {renderSectionHeader(activeSectionMeta.icon, activeSectionMeta.title, activeSectionMeta.count)}
+
+          {activeSection === 'invites' &&
+            (pendingInvitesForMe.length === 0 ? (
             renderEmptyState('No invites yet. Club leads can invite you to join.')
           ) : (
-            receivedInvitations.map((request) => {
+            pendingInvitesForMe.map((request) => {
               const club = clubs.find((c) => c.id === request.clubId);
               return (
                 <View key={request.id} style={styles.card}>
@@ -268,17 +372,19 @@ export const NotificationsScreen: React.FC = () => {
                     </View>
                     {renderStatusBadge(request)}
                   </View>
-                  {request.status === 'pending' && (
+                  {getEffectiveStatus(request) === 'pending' && (
                     <View style={styles.actionRow}>
                       <TouchableOpacity
-                        style={styles.declineButton}
+                        style={[styles.declineButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
                         onPress={() => handleInvitationDecision(request, 'rejected')}
+                        disabled={!!processingRequestIds[request.id]}
                       >
                         <Text style={styles.declineButtonText}>Decline</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.acceptButton}
+                        style={[styles.acceptButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
                         onPress={() => handleInvitationDecision(request, 'accepted')}
+                        disabled={!!processingRequestIds[request.id]}
                       >
                         <Text style={styles.acceptButtonText}>Accept</Text>
                       </TouchableOpacity>
@@ -287,17 +393,10 @@ export const NotificationsScreen: React.FC = () => {
                 </View>
               );
             })
-          )}
-        </View>
+          ))}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIconBadge, { backgroundColor: '#EEF2FF' }]}>
-              <Ionicons name="paper-plane-outline" size={16} color="#4C1D95" />
-            </View>
-            <Text style={styles.sectionTitle}>My applications</Text>
-          </View>
-          {pendingApplications.length === 0 ? (
+          {activeSection === 'applications' &&
+            (pendingApplications.length === 0 ? (
             renderEmptyState("You haven't requested to join any clubs yet.")
           ) : (
             pendingApplications.map((request) => {
@@ -317,25 +416,22 @@ export const NotificationsScreen: React.FC = () => {
                     </View>
                     {renderStatusBadge(request)}
                   </View>
-                  {request.status === 'pending' && (
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelRequest(request)}>
+                  {getEffectiveStatus(request) === 'pending' && (
+                    <TouchableOpacity
+                      style={[styles.cancelButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
+                      onPress={() => handleCancelRequest(request)}
+                      disabled={!!processingRequestIds[request.id]}
+                    >
                       <Text style={styles.cancelButtonText}>Cancel request</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               );
             })
-          )}
-        </View>
+          ))}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIconBadge, { backgroundColor: '#ECFDF5' }]}>
-              <Ionicons name="shield-checkmark-outline" size={16} color="#047857" />
-            </View>
-            <Text style={styles.sectionTitle}>Incoming requests (your clubs)</Text>
-          </View>
-          {pendingIncoming.length === 0 ? (
+          {activeSection === 'incoming' &&
+            (pendingIncoming.length === 0 ? (
             renderEmptyState('No new join requests yet. Members will appear here.')
           ) : (
             pendingIncoming.map((request) => {
@@ -357,12 +453,20 @@ export const NotificationsScreen: React.FC = () => {
                     </View>
                     {renderStatusBadge(request)}
                   </View>
-                  {request.status === 'pending' && (
+                  {getEffectiveStatus(request) === 'pending' && (
                     <View style={styles.actionRow}>
-                      <TouchableOpacity style={styles.declineButton} onPress={() => handleApplicationDecision(request, 'rejected')}>
+                      <TouchableOpacity
+                        style={[styles.declineButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
+                        onPress={() => handleApplicationDecision(request, 'rejected')}
+                        disabled={!!processingRequestIds[request.id]}
+                      >
                         <Text style={styles.declineButtonText}>Decline</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.acceptButton} onPress={() => handleApplicationDecision(request, 'accepted')}>
+                      <TouchableOpacity
+                        style={[styles.acceptButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
+                        onPress={() => handleApplicationDecision(request, 'accepted')}
+                        disabled={!!processingRequestIds[request.id]}
+                      >
                         <Text style={styles.acceptButtonText}>Accept</Text>
                       </TouchableOpacity>
                     </View>
@@ -370,17 +474,10 @@ export const NotificationsScreen: React.FC = () => {
                 </View>
               );
             })
-          )}
-        </View>
+          ))}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIconBadge, { backgroundColor: '#FFF7ED' }]}>
-              <Ionicons name="sparkles-outline" size={16} color="#C2410C" />
-            </View>
-            <Text style={styles.sectionTitle}>Invites you sent</Text>
-          </View>
-          {pendingSentInvites.length === 0 ? (
+          {activeSection === 'sent' &&
+            (pendingSentInvites.length === 0 ? (
             renderEmptyState('Invite members from Find Members to see them here.')
           ) : (
             pendingSentInvites.map((request) => {
@@ -400,15 +497,19 @@ export const NotificationsScreen: React.FC = () => {
                     </View>
                     {renderStatusBadge(request)}
                   </View>
-                  {request.status === 'pending' && (
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancelInvite(request)}>
+                  {getEffectiveStatus(request) === 'pending' && (
+                    <TouchableOpacity
+                      style={[styles.cancelButton, processingRequestIds[request.id] && styles.actionButtonDisabled]}
+                      onPress={() => handleCancelInvite(request)}
+                      disabled={!!processingRequestIds[request.id]}
+                    >
                       <Text style={styles.cancelButtonText}>Cancel invite</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               );
             })
-          )}
+          ))}
         </View>
       </ScrollView>
     </View>
@@ -422,14 +523,9 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
   header: {
     flexDirection: 'row',
@@ -446,34 +542,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#fff',
   },
   headerSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 4,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.82)',
+    marginTop: 2,
   },
   content: {
-    padding: 20,
-    paddingBottom: 120,
-    gap: 28,
+    padding: 16,
+    paddingBottom: 96,
+    gap: 18,
   },
   summaryScroll: {
-    paddingVertical: 12,
-    paddingRight: 16,
-    paddingLeft: 4,
+    paddingVertical: 4,
+    paddingRight: 8,
+    paddingLeft: 0,
+    flexGrow: 1,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   summaryTile: {
-    width: 190,
-    borderRadius: 18,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    minWidth: 150,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  summaryTileActive: {
+    borderColor: '#E372A1',
+    backgroundColor: '#FFF5F8',
   },
   summaryTileHeader: {
     flexDirection: 'row',
@@ -481,50 +586,69 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryTileLabel: {
-    color: '#fff',
-    fontSize: 13,
+    color: '#4B5563',
+    fontSize: 12,
     fontWeight: '600',
   },
   summaryTileCount: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-    marginTop: 12,
-  },
-  summaryTileHint: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 6,
   },
   section: {
-    gap: 12,
+    gap: 8,
   },
   sectionHeader: {
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
   },
   sectionIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#FFF5F8',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sectionCountBadge: {
+    minWidth: 26,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    backgroundColor: '#EEF2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4B5563',
   },
   emptySectionText: {
     fontSize: 14,
     color: '#9CA3AF',
   },
   card: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 14,
-    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -566,7 +690,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#111827',
   },
@@ -626,5 +750,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  actionButtonDisabled: {
+    opacity: 0.55,
   },
 });

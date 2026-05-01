@@ -8,6 +8,8 @@ alter table if exists public.clubs add column if not exists college_id text;
 alter table if exists public.clubs add column if not exists college_name text;
 alter table if exists public.events add column if not exists college_id text;
 alter table if exists public.events add column if not exists college_name text;
+alter table if exists public.events add column if not exists registered_user_ids uuid[] default '{}'::uuid[];
+alter table if exists public.events add column if not exists registered_count int default 0;
 alter table if exists public.marketplace_items add column if not exists college_id text;
 alter table if exists public.marketplace_items add column if not exists college_name text;
 alter table if exists public.marketplace_items add column if not exists seller_college_name text;
@@ -178,6 +180,8 @@ create table if not exists public.events (
   banner_image text,
   interested_user_ids uuid[] default '{}'::uuid[],
   interested_count int default 0,
+  registered_user_ids uuid[] default '{}'::uuid[],
+  registered_count int default 0,
   created_by uuid references public.profiles(id),
   created_at timestamptz default now()
 );

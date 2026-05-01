@@ -27,6 +27,8 @@ const normalizeEventRow = (row: any): Event => ({
   bannerImage: row.banner_image || row.bannerImage || undefined,
   interestedUserIds: row.interested_user_ids || row.interestedUserIds || [],
   interestedCount: row.interested_count ?? row.interestedCount ?? 0,
+  registeredUserIds: row.registered_user_ids || row.registeredUserIds || [],
+  registeredCount: row.registered_count ?? row.registeredCount ?? 0,
   createdBy: row.created_by || row.createdBy || '',
 });
 
@@ -142,6 +144,7 @@ interface AppState {
   }) => Promise<Event>;
   updateEvent: (eventId: string, updates: Partial<Event>) => void;
   toggleEventInterest: (eventId: string, userId: string) => void;
+  toggleEventRegistration: (eventId: string, userId: string) => void;
 
   // Marketplace
   marketplaceItems: MarketplaceItem[];
@@ -350,6 +353,7 @@ export const useStore = create<AppState>((set, get) => {
               college_name: profile.collegeName || '',
               year: profile.year || 'Freshman',
               semester: profile.semester || '1',
+              profile_photo: profile.profilePhoto || '',
               interests: profile.interests || [],
             },
           },
@@ -372,6 +376,7 @@ export const useStore = create<AppState>((set, get) => {
             major: profile.major || '',
             year: profile.year || 'Freshman',
             semester: profile.semester || '1',
+            profile_photo: profile.profilePhoto || null,
             interests: profile.interests || [],
           } as any;
         await supabase.from('profiles').upsert(newProfile);
@@ -607,18 +612,55 @@ export const useStore = create<AppState>((set, get) => {
     if (!currentUser) {
       throw new Error('Not authenticated');
     }
-    let resolvedBannerImage: string | null = payload.bannerImage || null;
-    if (resolvedBannerImage && !/^https?:\/\//i.test(resolvedBannerImage)) {
-      try {
-        resolvedBannerImage = await uploadImageToSupabase(
-          resolvedBannerImage,
-          `event-banners/${payload.clubId}/${currentUser.id}`
-        );
-      } catch (uploadErr) {
-        console.error('event banner upload failed', uploadErr);
-        throw new Error('Could not upload event poster');
-      }
-    }
+    const localBannerUri =
+      payload.bannerImage && !/^https?:\/\//i.test(payload.bannerImage) ? payload.bannerImage : null;
+    const resolvedBannerImage: string | null =
+      payload.bannerImage && /^https?:\/\//i.test(payload.bannerImage) ? payload.bannerImage : null;
+    const scheduleBackgroundBannerUpload = (eventId: string) => {
+      if (!localBannerUri) return;
+
+      const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+          });
+          return await Promise.race([promise, timeoutPromise]);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      };
+
+      void (async () => {
+        try {
+          const uploadedUrl = await withTimeout(
+            uploadImageToSupabase(localBannerUri, `event-banners/${payload.clubId}/${currentUser.id}`),
+            15000,
+            'Event poster upload timed out'
+          );
+
+          // Best-effort persistence.
+          try {
+            const { error: patchErr } = await supabase
+              .from('events')
+              .update({ banner_image: uploadedUrl })
+              .eq('id', eventId);
+            if (patchErr) throw patchErr;
+          } catch (patchErr) {
+            console.warn('background event banner patch failed', patchErr);
+          }
+
+          // Always update local state so UI reflects the uploaded poster quickly.
+          set((state) => ({
+            events: state.events.map((event) =>
+              event.id === eventId ? { ...event, bannerImage: uploadedUrl } : event
+            ),
+          }));
+        } catch (uploadErr) {
+          console.warn('background event banner upload failed', uploadErr);
+        }
+      })();
+    };
 
     const api = await import('../lib/api');
     if (api.isBackendConfigured()) {
@@ -639,6 +681,7 @@ export const useStore = create<AppState>((set, get) => {
         const created = (res as any).data || res;
         const normalized = normalizeEventRow(created);
         set((state) => ({ events: [...state.events, normalized] }));
+        scheduleBackgroundBannerUpload(normalized.id);
         return normalized;
       } catch (error) {
         console.error('createEvent backend error', error);
@@ -657,6 +700,8 @@ export const useStore = create<AppState>((set, get) => {
       banner_image: resolvedBannerImage,
       interested_user_ids: [],
       interested_count: 0,
+      registered_user_ids: [],
+      registered_count: 0,
       created_by: currentUser.id,
       college_id: currentUser.collegeId || null,
       college_name: currentUser.collegeName || null,
@@ -674,6 +719,8 @@ export const useStore = create<AppState>((set, get) => {
 
     const normalized = normalizeEventRow(data);
     set((state) => ({ events: [...state.events, normalized] }));
+    scheduleBackgroundBannerUpload(normalized.id);
+
     return normalized;
   },
 
@@ -693,23 +740,119 @@ export const useStore = create<AppState>((set, get) => {
       events: state.events.map((e) => (e.id === eventId ? { ...e, ...updates } : e)),
     })),
 
-  toggleEventInterest: (eventId, userId) =>
+  toggleEventInterest: (eventId, userId) => {
+    const previousEvents = get().events;
+    const previousEvent = previousEvents.find((e) => e.id === eventId);
+    if (!previousEvent) return;
+
+    const previousInterestedList = previousEvent.interestedUserIds || [];
+    const wasInterested = previousInterestedList.includes(userId);
+    const nextInterestedList = wasInterested
+      ? previousInterestedList.filter((id) => id !== userId)
+      : [...previousInterestedList, userId];
+    const nextInterestedCount = Math.max(
+      0,
+      wasInterested ? (previousEvent.interestedCount || 0) - 1 : (previousEvent.interestedCount || 0) + 1
+    );
+
+    // Optimistic UI update
     set((state) => ({
-      events: state.events.map((e) => {
-        if (e.id === eventId) {
-          const interestedList = e.interestedUserIds || [];
-          const isInterested = interestedList.includes(userId);
-          return {
-            ...e,
-            interestedUserIds: isInterested
-              ? interestedList.filter((id) => id !== userId)
-              : [...interestedList, userId],
-            interestedCount: Math.max(0, isInterested ? (e.interestedCount || 0) - 1 : (e.interestedCount || 0) + 1),
-          };
-        }
-        return e;
-      }),
-    })),
+      events: state.events.map((e) =>
+        e.id === eventId
+          ? {
+              ...e,
+              interestedUserIds: nextInterestedList,
+              interestedCount: nextInterestedCount,
+            }
+          : e
+      ),
+    }));
+
+    // Persist to DB in background
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('events')
+          .update({
+            interested_user_ids: nextInterestedList,
+            interested_count: nextInterestedCount,
+          })
+          .eq('id', eventId);
+        if (error) throw error;
+      } catch (err) {
+        console.error('toggleEventInterest persist error', err);
+        // Roll back optimistic update if persistence fails
+        set((state) => ({
+          events: state.events.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  interestedUserIds: previousInterestedList,
+                  interestedCount: previousEvent.interestedCount || 0,
+                }
+              : e
+          ),
+        }));
+      }
+    })();
+  },
+
+  toggleEventRegistration: (eventId, userId) => {
+    const previousEvents = get().events;
+    const previousEvent = previousEvents.find((e) => e.id === eventId);
+    if (!previousEvent) return;
+
+    const previousRegisteredList = previousEvent.registeredUserIds || [];
+    const wasRegistered = previousRegisteredList.includes(userId);
+    const nextRegisteredList = wasRegistered
+      ? previousRegisteredList.filter((id) => id !== userId)
+      : [...previousRegisteredList, userId];
+    const nextRegisteredCount = Math.max(
+      0,
+      wasRegistered ? (previousEvent.registeredCount || 0) - 1 : (previousEvent.registeredCount || 0) + 1
+    );
+
+    // Optimistic update
+    set((state) => ({
+      events: state.events.map((e) =>
+        e.id === eventId
+          ? {
+              ...e,
+              registeredUserIds: nextRegisteredList,
+              registeredCount: nextRegisteredCount,
+            }
+          : e
+      ),
+    }));
+
+    // Persist in background
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('events')
+          .update({
+            registered_user_ids: nextRegisteredList,
+            registered_count: nextRegisteredCount,
+          })
+          .eq('id', eventId);
+        if (error) throw error;
+      } catch (err) {
+        console.error('toggleEventRegistration persist error', err);
+        // rollback
+        set((state) => ({
+          events: state.events.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  registeredUserIds: previousRegisteredList,
+                  registeredCount: previousEvent.registeredCount || 0,
+                }
+              : e
+          ),
+        }));
+      }
+    })();
+  },
 
   // Marketplace state
   marketplaceItems: [],

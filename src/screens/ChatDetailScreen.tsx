@@ -53,6 +53,7 @@ export const ChatDetailScreen: React.FC = () => {
     updateClub,
     events,
     sendMessage,
+    joinRequests,
   } = useStore();
 
   const [messageText, setMessageText] = useState('');
@@ -80,6 +81,25 @@ export const ChatDetailScreen: React.FC = () => {
   const club = chat?.clubId ? clubs.find((c) => c.id === chat.clubId) : undefined;
   const isGroupChat = !!(chat && (chat.type === 'group' || chat.clubId));
   const members = useMemo(() => club?.memberIds || chat?.participantIds || [], [club, chat]);
+  const senderNamesById = useMemo(() => {
+    const out: Record<string, string> = {};
+    (messages || []).forEach((message) => {
+      if (message.senderId && message.senderName && message.senderId !== 'system') {
+        out[message.senderId] = message.senderName;
+      }
+    });
+    return out;
+  }, [messages]);
+  const joinRequestNamesById = useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!club?.id) return out;
+    joinRequests
+      .filter((request) => request.clubId === club.id && !!request.userId && !!request.userName)
+      .forEach((request) => {
+        out[request.userId] = request.userName;
+      });
+    return out;
+  }, [joinRequests, club?.id]);
   const clubEvents = useMemo(() => (club ? events.filter((event) => event.clubId === club.id) : []), [events, club?.id]);
   const isLeader = !!(club && currentUser && club.leaderId === currentUser.id);
 
@@ -336,15 +356,26 @@ export const ChatDetailScreen: React.FC = () => {
 
 
   const renderMemberName = (memberId: string) => {
+    const idSuffix = typeof memberId === 'string' && memberId.length >= 4 ? memberId.slice(-4).toUpperCase() : '';
     if (club?.leaderId === memberId) {
-      const leaderLabel = memberNames[memberId] || club.leaderName || 'Club Lead';
-      const suffix = currentUser?.id === memberId ? ' (You • Lead)' : ' (Lead)';
+      const leaderLabel =
+        memberNames[memberId] ||
+        senderNamesById[memberId] ||
+        joinRequestNamesById[memberId] ||
+        club.leaderName ||
+        'Club Lead';
+      const suffix = currentUser?.id === memberId ? ' (You - Lead)' : ' (Lead)';
       return `${leaderLabel}${suffix}`;
     }
     if (memberId === currentUser?.id && currentUser) {
       return `${currentUser.name} (You)`;
     }
-    return memberNames[memberId] || 'Member';
+    return (
+      memberNames[memberId] ||
+      senderNamesById[memberId] ||
+      joinRequestNamesById[memberId] ||
+      (idSuffix ? `Member ${idSuffix}` : 'Member')
+    );
   };
 
   const updateChatParticipants = (updatedMembers: string[]) => {
@@ -1436,3 +1467,4 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
+

@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  Alert,
   Share,
   ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,16 +25,18 @@ export const EventDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const eventParam: Event | undefined = route.params?.event;
   const eventIdParam: string | undefined = route.params?.eventId;
-  const { currentUser, toggleEventInterest, events, fetchEvents } = useStore();
+  const { currentUser, toggleEventInterest, toggleEventRegistration, events, fetchEvents } = useStore();
 
   // Get the latest event data from store
   const resolvedEventId = eventParam?.id || eventIdParam;
   const event = events.find((e) => e.id === resolvedEventId) || eventParam;
   const isCreator = !!(currentUser?.id && event?.createdBy === currentUser.id);
-
-  const [isInterested, setIsInterested] = useState(
-    event?.interestedUserIds?.includes(currentUser?.id || '') || false
-  );
+  const isInterested = !!(event?.interestedUserIds || []).includes(currentUser?.id || '');
+  const isRegistered = !!(event?.registeredUserIds || []).includes(currentUser?.id || '');
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupIcon, setPopupIcon] = useState<'heart' | 'checkmark-circle' | 'information-circle'>('information-circle');
 
   useEffect(() => {
     if (!event && resolvedEventId) {
@@ -49,33 +52,56 @@ export const EventDetailScreen: React.FC = () => {
     );
   }
 
+  const showPopup = (
+    title: string,
+    message: string,
+    icon: 'heart' | 'checkmark-circle' | 'information-circle'
+  ) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupIcon(icon);
+    setPopupVisible(true);
+  };
+
   const handleInterested = () => {
     if (isCreator) {
-      Alert.alert('Your event', 'You created this event.');
+      showPopup('Your Event', 'You created this event.', 'information-circle');
       return;
     }
     if (currentUser) {
       toggleEventInterest(event.id, currentUser.id);
-      setIsInterested(!isInterested);
-      Alert.alert(
+      showPopup(
         isInterested ? 'Removed' : 'Added!',
         isInterested
           ? 'Removed from interested list'
-          : 'Marked as interested! You will be notified of any updates.'
+          : 'Marked as interested! You will be notified of any updates.',
+        isInterested ? 'information-circle' : 'heart'
       );
     }
   };
 
   const handleRegister = () => {
     if (isCreator) {
-      Alert.alert('Your event', 'You created this event.');
+      showPopup('Your Event', 'You created this event.', 'information-circle');
       return;
     }
-    Alert.alert(
-      'Registration Successful!',
-      'You have been registered for this event. Check your email for confirmation.',
-      [{ text: 'OK' }]
+    if (currentUser) {
+      toggleEventRegistration(event.id, currentUser.id);
+    }
+    showPopup(
+      isRegistered ? 'Registration Removed' : 'Registration Successful!',
+      isRegistered ? 'You are no longer registered for this event.' : 'You have been registered for this event.',
+      'checkmark-circle'
     );
+  };
+
+  const handleOpenManageEvent = () => {
+    if (!event) return;
+    // ManageEvent lives inside the Events tab stack, not Home stack.
+    navigation.navigate('Events', {
+      screen: 'ManageEvent',
+      params: { event },
+    });
   };
 
   const handleShareEvent = async () => {
@@ -99,7 +125,7 @@ export const EventDetailScreen: React.FC = () => {
       lines.push(`Open in CampusClub: campusclub://event/${event.id}`);
       await Share.share({ message: lines.join('\n') });
     } catch (err) {
-      Alert.alert('Share failed', 'Could not open share options right now.');
+      showPopup('Share Failed', 'Could not open share options right now.', 'information-circle');
     }
   };
 
@@ -117,9 +143,19 @@ export const EventDetailScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Details</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShareEvent}>
-          <Ionicons name="share-outline" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          {isCreator && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleOpenManageEvent}
+            >
+              <Ionicons name="create-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.shareButton} onPress={handleShareEvent}>
+            <Ionicons name="share-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -185,15 +221,15 @@ export const EventDetailScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Interested Card */}
+            {/* Registered Card */}
             <View style={styles.infoCard}>
               <View style={styles.infoIconContainer}>
-                <Ionicons name="heart-outline" size={24} color="#B06579" />
+                <Ionicons name="checkmark-circle-outline" size={24} color="#B06579" />
               </View>
               <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>Interested</Text>
+                <Text style={styles.infoLabel}>Registered</Text>
                 <Text style={styles.infoValue}>
-                  {event.interestedCount} {event.interestedCount === 1 ? 'person' : 'people'}
+                  {event.registeredCount} {event.registeredCount === 1 ? 'person' : 'people'}
                 </Text>
               </View>
             </View>
@@ -232,10 +268,36 @@ export const EventDetailScreen: React.FC = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={styles.joinButtonText}>Register Now</Text>
+            <Text style={styles.joinButtonText}>{isRegistered ? 'Registered' : 'Register Now'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={popupVisible}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setPopupVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setPopupVisible(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.modalRoot}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name={popupIcon} size={26} color="#B06579" />
+            </View>
+
+            <Text style={styles.modalTitle}>{popupTitle}</Text>
+            <Text style={styles.modalMessage}>{popupMessage}</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={() => setPopupVisible(false)}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -443,11 +505,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   joinButtonText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
     letterSpacing: 0.3,
     lineHeight: 20,
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  modalRoot: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFF5F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  modalButton: {
+    minWidth: 120,
+    backgroundColor: '#B06579',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

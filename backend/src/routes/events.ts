@@ -70,4 +70,63 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/:eventId/interaction', requireAuth, async (req, res) => {
+  try {
+    const eventId = String(req.params.eventId || '').trim();
+    const userId = (req as any).user?.id;
+    const kind = String(req.body?.kind || '').trim(); // 'interested' | 'registered'
+    if (!eventId || !userId) {
+      return res.status(400).json({ error: 'Missing eventId or user' });
+    }
+    if (kind !== 'interested' && kind !== 'registered') {
+      return res.status(400).json({ error: 'Invalid interaction kind' });
+    }
+
+    const { data: eventRow, error: eventErr } = await supabaseServer
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .single();
+    if (eventErr || !eventRow) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const interestedList = Array.isArray((eventRow as any).interested_user_ids)
+      ? ((eventRow as any).interested_user_ids as string[])
+      : [];
+    const registeredList = Array.isArray((eventRow as any).registered_user_ids)
+      ? ((eventRow as any).registered_user_ids as string[])
+      : [];
+
+    let nextInterested = interestedList;
+    let nextRegistered = registeredList;
+    if (kind === 'interested') {
+      const has = interestedList.includes(userId);
+      nextInterested = has ? interestedList.filter((id) => id !== userId) : [...interestedList, userId];
+    } else {
+      const has = registeredList.includes(userId);
+      nextRegistered = has ? registeredList.filter((id) => id !== userId) : [...registeredList, userId];
+    }
+
+    const patch = {
+      interested_user_ids: nextInterested,
+      interested_count: nextInterested.length,
+      registered_user_ids: nextRegistered,
+      registered_count: nextRegistered.length,
+    };
+
+    const { data: updated, error: updateErr } = await supabaseServer
+      .from('events')
+      .update(patch)
+      .eq('id', eventId)
+      .select('*')
+      .single();
+    if (updateErr) throw updateErr;
+    return res.json({ data: updated });
+  } catch (err: any) {
+    console.error('POST /api/events/:eventId/interaction error', err.message || err);
+    res.status(500).json({ error: 'Failed to update event interaction' });
+  }
+});
+
 export default router;
