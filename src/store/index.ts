@@ -30,6 +30,7 @@ const normalizeEventRow = (row: any): Event => ({
   registeredUserIds: row.registered_user_ids || row.registeredUserIds || [],
   registeredCount: row.registered_count ?? row.registeredCount ?? 0,
   createdBy: row.created_by || row.createdBy || '',
+  isClosed: !!(row.is_closed ?? row.isClosed),
 });
 
 const normalizeClubRow = (row: any): Club => ({
@@ -702,6 +703,7 @@ export const useStore = create<AppState>((set, get) => {
       interested_count: 0,
       registered_user_ids: [],
       registered_count: 0,
+      is_closed: false,
       created_by: currentUser.id,
       college_id: currentUser.collegeId || null,
       college_name: currentUser.collegeName || null,

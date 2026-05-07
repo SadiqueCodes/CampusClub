@@ -12,7 +12,7 @@ export const EventsScreen: React.FC = () => {
   const route = useRoute<any>();
   const { events, currentUser } = useStore();
   const allEvents = useMemo(
-    () => [...events].sort((a, b) => a.date.getTime() - b.date.getTime()),
+    () => [...events].filter((event) => !event.isClosed).sort((a, b) => a.date.getTime() - b.date.getTime()),
     [events]
   );
   const myEvents = useMemo(

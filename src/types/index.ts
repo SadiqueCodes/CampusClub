@@ -50,6 +50,7 @@ export interface Event {
   registeredUserIds: string[];
   registeredCount: number;
   createdBy: string;
+  isClosed?: boolean;
 }
 
 export interface MarketplaceItem {

@@ -40,12 +40,12 @@ export const ProfileScreen: React.FC = () => {
   const registeredEvents = useMemo(() => {
     const myId = currentUser?.id || '';
     return [...events]
-      .filter((event) => (event.registeredUserIds || []).includes(myId))
+      .filter((event) => !event.isClosed && (event.registeredUserIds || []).includes(myId))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [events, currentUser?.id]);
-  const profileEventCount = Math.max(
-    Number(currentUser?.eventsAttended || 0),
-    attendedFromEvents
+  const organizedEventsCount = useMemo(
+    () => events.filter((event) => event.createdBy === currentUser?.id).length,
+    [events, currentUser?.id]
   );
   const openClubFromProfile = (clubId: string) => {
     const clubChat = chats.find((chat) => chat.clubId === clubId);
@@ -93,7 +93,7 @@ export const ProfileScreen: React.FC = () => {
             style={styles.settingsButton}
             onPress={() => navigation.navigate('ProfileSettings')}
           >
-            <Ionicons name="settings-outline" size={20} color="#fff" />
+            <Ionicons name="settings-outline" size={17} color="#fff" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -135,8 +135,8 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.snapshotValue}>{clubCount}</Text>
           </View>
           <View style={styles.snapshotChip}>
-            <Text style={styles.snapshotLabel}>Events</Text>
-            <Text style={styles.snapshotValue}>{profileEventCount}</Text>
+            <Text style={styles.snapshotLabel}>Organized</Text>
+            <Text style={styles.snapshotValue}>{organizedEventsCount}</Text>
           </View>
           <View style={styles.snapshotChip}>
             <Text style={styles.snapshotLabel}>Listings</Text>
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingTop: 48,
-    paddingBottom: 24,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
-    gap: 20,
+    gap: 14,
   },
   headerRow: {
     flexDirection: 'row',
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: '#fff',
   },
@@ -300,9 +300,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
     backgroundColor: 'rgba(255,255,255,0.2)',

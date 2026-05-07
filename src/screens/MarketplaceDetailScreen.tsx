@@ -143,6 +143,8 @@ export const MarketplaceDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+    paddingTop: 48,
+    backgroundColor: '#F8F9FA',
   },
   emptyContainer: {
     flex: 1,
@@ -156,13 +158,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#F0D3DE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    shadowColor: '#E372A1',
+    shadowOpacity: 0.14,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 3,
   },
   mediaCard: {
     borderRadius: 24,

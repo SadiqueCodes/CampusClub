@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ScrollView, Dimensions, TextInput, Alert, GestureResponderEvent, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -960,6 +960,18 @@ const CreateClubModal: React.FC<{
 }> = ({ visible, onClose, clubName, setClubName, clubType, setClubType, clubDescription, setClubDescription, clubTypes, isSubmitting, onSubmit }) => {
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [customTypeName, setCustomTypeName] = useState('');
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardOpen(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   return (
     <Modal
@@ -973,6 +985,11 @@ const CreateClubModal: React.FC<{
         <View style={styles.modalOverlay} />
       </TouchableWithoutFeedback>
       <View style={styles.modalRoot}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 18 : 8}
+          style={styles.modalKeyboardWrap}
+        >
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create New Club</Text>
@@ -981,7 +998,12 @@ const CreateClubModal: React.FC<{
             </TouchableOpacity>
           </View>
 
-          <ScrollView>
+          <ScrollView
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            contentContainerStyle={[styles.modalScrollContent, { paddingBottom: isKeyboardOpen ? 290 : 24 }]}
+            showsVerticalScrollIndicator={false}
+          >
             <Input
               label="Club Name"
               placeholder="Enter club name..."
@@ -1068,6 +1090,7 @@ const CreateClubModal: React.FC<{
             </TouchableOpacity>
           </ScrollView>
         </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -1243,12 +1266,18 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
   },
+  modalKeyboardWrap: {
+    width: '100%',
+  },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: SCREEN_HEIGHT * 0.85,
+  },
+  modalScrollContent: {
+    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',

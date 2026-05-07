@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Dimensions, Modal, TextInput, Alert, Keyboard, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ export const HomeScreen: React.FC = () => {
   const [listingDescription, setListingDescription] = useState('');
   const [listingPrice, setListingPrice] = useState('');
   const [listingPhone, setListingPhone] = useState('');
+  const [isListingKeyboardOpen, setIsListingKeyboardOpen] = useState(false);
   const [isListingSaving, setIsListingSaving] = useState(false);
   const [listingImage, setListingImage] = useState<string | null>(null);
   const fetchInitialData = useStore((s) => s.fetchInitialData);
@@ -327,7 +328,9 @@ export const HomeScreen: React.FC = () => {
 
   const isClubLeader = currentUser && clubs.some(c => c.leaderId === currentUser.id);
   const homeEvents = useMemo(() => {
-    const sorted = [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
+    const sorted = [...events]
+      .filter((e) => !e.isClosed)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
     return sorted.slice(0, 4);
   }, [events]);
   const activeMarketplaceItems = useMemo(
@@ -381,6 +384,18 @@ export const HomeScreen: React.FC = () => {
     setListingPhone('');
     setListingImage(null);
   };
+
+  useEffect(() => {
+    if (!showListingModal) return;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setIsListingKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsListingKeyboardOpen(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [showListingModal]);
 
   const handlePickListingImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -442,7 +457,7 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.eventsHeaderRow}>
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
             <View style={styles.eventsActionsRow}>
-              {events.length > 4 && (
+              {events.filter((e) => !e.isClosed).length > 4 && (
                 <TouchableOpacity
                   onPress={() =>
                     navigation.navigate('Events', {
@@ -574,10 +589,18 @@ export const HomeScreen: React.FC = () => {
         onRequestClose={closeListingModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.listingModalCardWrap}>
+            <ScrollView
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              contentContainerStyle={{ paddingBottom: isListingKeyboardOpen ? 180 : 0 }}
+              showsVerticalScrollIndicator={false}
+              style={styles.listingModalScroll}
+            >
+            <View style={styles.modalContent}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalTitle}>List an Item</Text>
-              <TouchableOpacity onPress={closeListingModal}>
+              <TouchableOpacity onPress={closeListingModal} disabled={isListingSaving} style={isListingSaving ? { opacity: 0.5 } : undefined}>
                 <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -646,6 +669,8 @@ export const HomeScreen: React.FC = () => {
                 {isListingSaving ? 'Saving...' : 'Create Listing'}
               </Text>
             </TouchableOpacity>
+            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -713,7 +738,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 60,
   },
   section: {
     marginTop: 16,
@@ -1080,7 +1105,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.62)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 0,
+  },
+  listingModalScroll: {
+    width: '100%',
+    maxHeight: '100%',
+  },
+  listingModalCardWrap: {
+    width: '100%',
+    maxHeight: '74%',
   },
   modalContent: {
     width: '100%',

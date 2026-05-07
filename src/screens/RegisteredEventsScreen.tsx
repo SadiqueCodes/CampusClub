@@ -12,7 +12,7 @@ export const RegisteredEventsScreen: React.FC = () => {
   const registeredEvents = useMemo(() => {
     const myId = currentUser?.id || '';
     return [...events]
-      .filter((event) => (event.registeredUserIds || []).includes(myId))
+      .filter((event) => !event.isClosed && (event.registeredUserIds || []).includes(myId))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [events, currentUser?.id]);
 
@@ -85,4 +85,3 @@ const styles = StyleSheet.create({
   eventTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 4 },
   eventMeta: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
 });
-

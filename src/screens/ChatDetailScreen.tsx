@@ -394,12 +394,46 @@ export const ChatDetailScreen: React.FC = () => {
 
   const handleExitClub = () => {
     if (!club || !currentUser) return;
-    if (club.leaderId === currentUser.id && club.memberIds.length > 1) {
+    const isLeaderExiting = club.leaderId === currentUser.id;
+    const remainingMembers = (club.memberIds || []).filter((id) => id !== currentUser.id);
+    if (isLeaderExiting && remainingMembers.length > 0) {
       Alert.alert('Transfer leadership', 'Assign a new leader before leaving the club.');
       return;
     }
     (async () => {
       try {
+        // Leader exiting while being the only member -> delete club entirely.
+        if (isLeaderExiting && remainingMembers.length === 0) {
+          if (isBackendConfigured()) {
+            try {
+              await api.del(`/clubs/${club.id}`);
+              await Promise.all([fetchClubs(), fetchChats()]);
+              navigation.goBack();
+              return;
+            } catch (e) {
+              // Fall through to Supabase direct delete path.
+            }
+          }
+
+          // Try deleting club first (works with FK cascade if configured).
+          const { error: clubDeleteErr } = await supabase.from('clubs').delete().eq('id', club.id);
+          if (clubDeleteErr) {
+            // Fallback cleanup for schemas without cascade.
+            const { error: jrErr } = await supabase.from('join_requests').delete().eq('club_id', club.id);
+            if (jrErr) console.warn('join_requests delete failed', jrErr);
+            const { error: evErr } = await supabase.from('events').delete().eq('club_id', club.id);
+            if (evErr) console.warn('events delete failed', evErr);
+            const { error: chatErr } = await supabase.from('chats').delete().eq('club_id', club.id);
+            if (chatErr) console.warn('chats delete failed', chatErr);
+            const { error: clubRetryErr } = await supabase.from('clubs').delete().eq('id', club.id);
+            if (clubRetryErr) throw clubRetryErr;
+          }
+
+          await Promise.all([fetchClubs(), fetchChats()]);
+          navigation.goBack();
+          return;
+        }
+
         if (isBackendConfigured()) {
           await api.leaveClub(club.id);
           await Promise.all([fetchClubs(), fetchChats()]);
@@ -413,14 +447,16 @@ export const ChatDetailScreen: React.FC = () => {
           memberCount: updatedMembers.length,
         });
         updateChatParticipants(updatedMembers);
+        await Promise.all([fetchClubs(), fetchChats()]);
         navigation.goBack();
       } catch (e: any) {
         const msg = e instanceof Error ? e.message : String(e || '');
+        console.warn('handleExitClub error', e);
         if (msg.includes('transfer leadership')) {
           Alert.alert('Transfer leadership', 'Assign a new leader before leaving the club.');
           return;
         }
-        Alert.alert('Exit failed', 'Could not leave this club right now. Please try again.');
+        Alert.alert('Exit failed', msg || 'Could not leave this club right now. Please try again.');
       }
     })();
   };

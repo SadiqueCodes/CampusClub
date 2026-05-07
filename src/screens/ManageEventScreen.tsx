@@ -47,6 +47,7 @@ export const ManageEventScreen: React.FC = () => {
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
 
   if (!event) {
     return null;
@@ -123,6 +124,23 @@ export const ManageEventScreen: React.FC = () => {
     setTimeout(() => {
       navigation.goBack();
     }, 500);
+  };
+
+  const handleCloseEvent = () => {
+    setShowCloseConfirmModal(true);
+  };
+
+  const confirmCloseEvent = async () => {
+    try {
+      useStore.getState().updateEvent(event.id, { isClosed: true } as any);
+      const { error } = await supabase.from('events').update({ is_closed: true }).eq('id', event.id);
+      if (error) throw error;
+      setShowCloseConfirmModal(false);
+      navigation.goBack();
+    } catch (e) {
+      console.warn('close event error', e);
+      Alert.alert('Could not close event', 'Please try again.');
+    }
   };
 
   return (
@@ -270,8 +288,62 @@ export const ManageEventScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>About Event</Text>
             <Text style={styles.description}>{event.description}</Text>
           </View>
+
+          <TouchableOpacity style={styles.closeEventButton} onPress={handleCloseEvent}>
+            <LinearGradient
+              colors={['#E372A1', '#CE678A', '#B06579']}
+              style={styles.closeEventButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Ionicons name="checkmark-done-circle-outline" size={18} color="#fff" />
+              <Text style={styles.closeEventButtonText}>Mark Event as Closed</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showCloseConfirmModal}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setShowCloseConfirmModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowCloseConfirmModal(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.confirmModalRoot}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconWrap}>
+              <Ionicons name="alert-circle-outline" size={24} color="#B06579" />
+            </View>
+            <Text style={styles.confirmTitle}>Close Event?</Text>
+            <Text style={styles.confirmMessage}>
+              This event will be hidden from event lists and cards.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancelButton}
+                onPress={() => setShowCloseConfirmModal(false)}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmCloseButton} onPress={confirmCloseEvent}>
+                <LinearGradient
+                  colors={['#E372A1', '#CE678A', '#B06579']}
+                  style={styles.confirmCloseGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.confirmCloseText}>Close Event</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal
@@ -643,9 +715,108 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.28)',
   },
+  closeEventButton: {
+    marginTop: 16,
+    marginBottom: 20,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#E372A1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  closeEventButtonGradient: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  closeEventButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  confirmCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    marginHorizontal: 24,
+    padding: 18,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  confirmIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF5F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmCancelButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  confirmCloseButton: {
+    flex: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    minHeight: 44,
+  },
+  confirmCloseGradient: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
   modalRoot: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
+  },
+  confirmModalRoot: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   modalContent: {
     backgroundColor: '#fff',

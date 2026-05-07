@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   resultsList: {
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 60,
   },
   clubCard: {
     backgroundColor: '#fff',
