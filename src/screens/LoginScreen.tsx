@@ -303,12 +303,9 @@ export const LoginScreen: React.FC = () => {
         Alert.alert('Missing info', 'Please enter a valid email address.');
         return false;
       }
-      const emailLower = email.toLowerCase();
-      if (!emailLower.endsWith('.edu') && !emailLower.endsWith('.edu.in')) {
-        Alert.alert(
-          'Invalid email',
-          'Please use your college email address (must end with .edu or .edu.in).'
-        );
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        Alert.alert('Invalid email', 'Please enter a valid email address.');
         return false;
       }
       if (!password || password.length < 6) {
@@ -602,7 +599,7 @@ export const LoginScreen: React.FC = () => {
                 <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="you@college.edu"
+                  placeholder="you@example.com"
                   placeholderTextColor="#DDD"
                   value={email}
                   onChangeText={setEmail}
@@ -611,7 +608,7 @@ export const LoginScreen: React.FC = () => {
                 />
               </View>
               <Text style={styles.helperText}>
-                <Ionicons name="information-circle" size={12} color="#9CA3AF" /> Use your college email address (.edu or .edu.in)
+                <Ionicons name="information-circle" size={12} color="#9CA3AF" /> Use a valid email address
               </Text>
             </View>
 
@@ -1347,7 +1344,7 @@ colors={['#B06579', '#CE678A', '#E372A1']}
               <Ionicons name="mail-outline" size={20} color="#B2BEB5" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="you@college.edu"
+                placeholder="you@example.com"
                 placeholderTextColor="#DDD"
                 value={forgotEmail}
                 onChangeText={setForgotEmail}

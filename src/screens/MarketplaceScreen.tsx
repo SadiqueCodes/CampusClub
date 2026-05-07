@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useStore } from '../store';
 import { MarketplaceItem } from '../types';
 
@@ -55,10 +56,17 @@ export const MarketplaceScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Marketplace</Text>
-        <Text style={styles.headerSubtitle}>Browse campus deals</Text>
-      </View>
+      <LinearGradient colors={['#E372A1', '#CE678A', '#B06579']} style={styles.headerGradient}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Marketplace</Text>
+            <Text style={styles.headerSubtitle}>Browse campus deals</Text>
+          </View>
+        </View>
+      </LinearGradient>
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color="#9CA3AF" />
         <TextInput
@@ -100,24 +108,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    paddingTop: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
   },
   headerSubtitle: {
-    color: '#6B7280',
-    marginTop: 6,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
     marginHorizontal: 20,
+    marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 16,

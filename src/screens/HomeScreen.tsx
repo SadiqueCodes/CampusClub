@@ -214,6 +214,20 @@ export const HomeScreen: React.FC = () => {
   };
 
   const popularClubs = heroClubs();
+  const popularClubsWithGradients = useMemo(() => {
+    let previousPaletteIndex = -1;
+    return popularClubs.map((club) => {
+      let paletteIndex = hashString(`${club.id || ''}-${club.name || ''}`) % heroCardGradients.length;
+      if (paletteIndex === previousPaletteIndex) {
+        paletteIndex = (paletteIndex + 1) % heroCardGradients.length;
+      }
+      previousPaletteIndex = paletteIndex;
+      return {
+        club,
+        gradient: heroCardGradients[paletteIndex] as [string, string],
+      };
+    });
+  }, [popularClubs]);
 
   const handleApplyToClub = async (club: Club) => {
     if (!currentUser) {
@@ -244,10 +258,11 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const renderClubCard = ({ item }: { item: Club }) => {
-    const [gradientStart, gradientEnd] = getClubGradient(item);
-    const isMember = currentUser ? (item.memberIds || []).includes(currentUser.id) : false;
-    const isPending = pendingRequestClubIds.has(item.id);
+  const renderClubCard = ({ item }: { item: { club: Club; gradient: [string, string] } }) => {
+    const club = item.club;
+    const [gradientStart, gradientEnd] = item.gradient;
+    const isMember = currentUser ? (club.memberIds || []).includes(currentUser.id) : false;
+    const isPending = pendingRequestClubIds.has(club.id);
     let ctaLabel = 'Apply';
     if (isMember) {
       ctaLabel = 'Joined';
@@ -266,11 +281,11 @@ export const HomeScreen: React.FC = () => {
           {/* Pattern Overlay */}
           <Svg width={280} height={160} style={styles.patternOverlay} pointerEvents="none">
             <Defs>
-              <Pattern id={`dots-${item.id}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+              <Pattern id={`dots-${club.id}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
                 <Circle cx="2" cy="2" r="1.5" fill="rgba(255,255,255,0.15)" />
               </Pattern>
             </Defs>
-            <Rect width="280" height="160" fill={`url(#dots-${item.id})`} />
+            <Rect width="280" height="160" fill={`url(#dots-${club.id})`} />
             <Circle cx="240" cy="30" r="60" fill="rgba(255,255,255,0.08)" />
             <Circle cx="30" cy="130" r="40" fill="rgba(255,255,255,0.08)" />
           </Svg>
@@ -279,26 +294,26 @@ export const HomeScreen: React.FC = () => {
             <View style={styles.clubCardContent}>
               <View style={styles.clubCardHeader}>
                 <View style={styles.clubLogoContainer}>
-                  {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.clubLogo} />
-                  ) : item.logoEmoji ? (
-                    <Text style={styles.clubLogoEmoji}>{item.logoEmoji}</Text>
+                  {club.logo ? (
+                    <Image source={{ uri: club.logo }} style={styles.clubLogo} />
+                  ) : club.logoEmoji ? (
+                    <Text style={styles.clubLogoEmoji}>{club.logoEmoji}</Text>
                   ) : (
-                    <Ionicons name={getClubIcon(item.type) as any} size={20} color="#fff" />
+                    <Ionicons name={getClubIcon(club.type) as any} size={20} color="#fff" />
                   )}
                 </View>
                 <View style={styles.clubCardBadge}>
                   <Ionicons name="people" size={10} color="#fff" />
-                  <Text style={styles.clubCardBadgeText}>{item.memberCount}</Text>
+                  <Text style={styles.clubCardBadgeText}>{club.memberCount}</Text>
                 </View>
               </View>
-              <Text style={styles.clubCardName} numberOfLines={2}>{item.name}</Text>
-              <Text style={styles.clubCardType} numberOfLines={1}>{item.type}</Text>
+              <Text style={styles.clubCardName} numberOfLines={2}>{club.name}</Text>
+              <Text style={styles.clubCardType} numberOfLines={1}>{club.type}</Text>
             </View>
             <TouchableOpacity
               style={[styles.applyButton, (isMember || isPending) && styles.applyButtonDisabled]}
               disabled={isMember || isPending}
-              onPress={() => handleApplyToClub(item)}
+              onPress={() => handleApplyToClub(club)}
             >
               <Text style={[styles.applyButtonText, (isMember || isPending) && styles.applyButtonTextMuted]}>
                 {ctaLabel}
@@ -409,9 +424,9 @@ export const HomeScreen: React.FC = () => {
           {popularClubs.length > 0 ? (
             <FlatList
               horizontal
-              data={popularClubs}
+              data={popularClubsWithGradients}
               renderItem={renderClubCard}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.club.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.clubsList}
             />
@@ -482,9 +497,11 @@ export const HomeScreen: React.FC = () => {
                         <Text style={styles.eventMetaText}>{item.time}</Text>
                       </View>
                       <View style={styles.eventMetaDivider} />
-                      <View style={styles.eventMetaItem}>
+                      <View style={[styles.eventMetaItem, styles.eventMetaLocationItem]}>
                         <Ionicons name="location" size={14} color="#6B7280" />
-                        <Text style={styles.eventMetaText} numberOfLines={1}>{item.location}</Text>
+                        <Text style={styles.eventMetaText} numberOfLines={1} ellipsizeMode="tail">
+                          {item.location}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -962,6 +979,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  eventMetaLocationItem: {
+    flex: 1,
+    minWidth: 0,
+  },
   eventMetaDivider: {
     width: 1,
     height: 16,
@@ -971,6 +992,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
+    flexShrink: 1,
   },
   marketplaceGrid: {
     flexDirection: 'row',
