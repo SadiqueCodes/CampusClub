@@ -150,9 +150,11 @@ interface AppState {
   // Marketplace
   marketplaceItems: MarketplaceItem[];
   myListings: MarketplaceItem[];
+  marketplaceFlags: Record<string, string[]>;
   setMarketplaceItems: (items: MarketplaceItem[]) => void;
   addMarketplaceItem: (item: MarketplaceItem) => void;
   updateMarketplaceItem: (itemId: string, updates: Partial<MarketplaceItem>) => void;
+  flagMarketplaceItem: (itemId: string, userId: string) => Promise<number>;
   createMarketplaceItem: (item: {
     title: string;
     description: string;
@@ -233,9 +235,10 @@ export const useStore = create<AppState>((set, get) => {
     if (!current) throw new Error('Not authenticated');
 
     const nextUser: User = { ...current, ...updates };
+    const nextEmail = (nextUser.email || '').trim();
     const dbUpdates: Record<string, any> = {
       name: nextUser.name,
-      email: nextUser.email,
+      email: nextEmail,
       college_id: nextUser.collegeId || null,
       college_name: nextUser.collegeName || null,
       major: nextUser.major || null,
@@ -255,7 +258,43 @@ export const useStore = create<AppState>((set, get) => {
       .upsert({ id: current.id, ...dbUpdates });
     if (error) throw error;
 
-    set({ currentUser: nextUser, isAuthenticated: true });
+    // Keep Supabase Auth email in sync when user edits email in profile.
+    const currentEmail = (current.email || '').trim().toLowerCase();
+    if (nextEmail && nextEmail.toLowerCase() !== currentEmail) {
+      const { error: authUpdateError } = await supabase.auth.updateUser({ email: nextEmail });
+      if (authUpdateError) {
+        console.warn('updateProfile auth email sync failed', authUpdateError);
+      }
+    }
+
+    // Keep seller snapshot fields in marketplace rows in sync for this user.
+    const { error: marketplaceSyncError } = await supabase
+      .from('marketplace_items')
+      .update({
+        seller_name: nextUser.name || '',
+        seller_major: nextUser.major || '',
+        seller_year: nextUser.year || '',
+      })
+      .eq('seller_id', current.id);
+    if (marketplaceSyncError) {
+      console.warn('updateProfile marketplace sync failed', marketplaceSyncError);
+    }
+
+    const patchedUser = { ...nextUser, email: nextEmail };
+    set((state) => ({
+      currentUser: patchedUser,
+      isAuthenticated: true,
+      marketplaceItems: state.marketplaceItems.map((item) =>
+        item.sellerId === current.id
+          ? { ...item, sellerName: patchedUser.name, sellerMajor: patchedUser.major, sellerYear: patchedUser.year }
+          : item
+      ),
+      myListings: state.myListings.map((item) =>
+        item.sellerId === current.id
+          ? { ...item, sellerName: patchedUser.name, sellerMajor: patchedUser.major, sellerYear: patchedUser.year }
+          : item
+      ),
+    }));
   },
 
   // legacy login kept for compatibility
@@ -859,6 +898,7 @@ export const useStore = create<AppState>((set, get) => {
   // Marketplace state
   marketplaceItems: [],
   myListings: [],
+  marketplaceFlags: {},
 
   setMarketplaceItems: (items) => set({ marketplaceItems: items }),
 
@@ -867,10 +907,17 @@ export const useStore = create<AppState>((set, get) => {
       const { data, error } = await supabase.from('marketplace_items').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       const normalized = (data || []).map(normalizeMarketplaceRow);
+      const flagsFromDb = (data || []).reduce((acc: Record<string, string[]>, row: any) => {
+        if (Array.isArray(row?.flagged_by_user_ids)) {
+          acc[row.id] = row.flagged_by_user_ids as string[];
+        }
+        return acc;
+      }, {});
       const currentUserId = get().currentUser?.id;
       set({
         marketplaceItems: normalized,
         myListings: currentUserId ? normalized.filter((item) => item.sellerId === currentUserId) : [],
+        marketplaceFlags: flagsFromDb,
       });
       get().subscribeToMarketplace();
     } catch (err) {
@@ -891,6 +938,84 @@ export const useStore = create<AppState>((set, get) => {
       ),
       myListings: state.myListings.map((i) => (i.id === itemId ? { ...i, ...updates } : i)),
     })),
+
+  flagMarketplaceItem: async (itemId, userId) => {
+    let persistedCount = 0;
+    let persistedUsers: string[] = [];
+    try {
+      // Prefer database RPC when available (works better with strict RLS).
+      const { data: rpcData, error: rpcError } = await supabase.rpc('flag_marketplace_item', {
+        p_item_id: itemId,
+      } as any);
+      if (!rpcError && rpcData !== null && rpcData !== undefined) {
+        persistedCount = Number(rpcData) || 0;
+        const known = get().marketplaceFlags[itemId] || [];
+        const mergedUsers = known.includes(userId) ? known : [...known, userId];
+        set((state) => {
+          const nextFlags = { ...state.marketplaceFlags, [itemId]: mergedUsers };
+          if (persistedCount < 3) return { marketplaceFlags: nextFlags } as any;
+          return {
+            marketplaceFlags: nextFlags,
+            marketplaceItems: state.marketplaceItems.filter((item) => item.id !== itemId),
+            myListings: state.myListings.filter((item) => item.id !== itemId),
+          } as any;
+        });
+        return persistedCount;
+      }
+
+      const { data: row, error: selectError } = await supabase
+        .from('marketplace_items')
+        .select('id, flag_count, flagged_by_user_ids')
+        .eq('id', itemId)
+        .single();
+      if (selectError) throw selectError;
+
+      const existingUsers: string[] = Array.isArray((row as any)?.flagged_by_user_ids)
+        ? ((row as any).flagged_by_user_ids as string[])
+        : [];
+      if (existingUsers.includes(userId)) {
+        persistedCount = Number((row as any)?.flag_count ?? existingUsers.length ?? 0);
+        set((state) => ({
+          marketplaceFlags: { ...state.marketplaceFlags, [itemId]: existingUsers },
+        }));
+        return persistedCount;
+      }
+
+      persistedUsers = [...existingUsers, userId];
+      persistedCount = persistedUsers.length;
+
+      const { error: updateError } = await supabase
+        .from('marketplace_items')
+        .update({
+          flag_count: persistedCount,
+          flagged_by_user_ids: persistedUsers,
+        })
+        .eq('id', itemId);
+      if (updateError) throw updateError;
+
+      if (persistedCount >= 3) {
+        const { error: removeError } = await supabase
+          .from('marketplace_items')
+          .delete()
+          .eq('id', itemId);
+        if (removeError) throw removeError;
+      }
+    } catch (err: any) {
+      console.warn('flagMarketplaceItem persist error', err);
+      throw err;
+    }
+
+    set((state) => {
+      const nextFlags = { ...state.marketplaceFlags, [itemId]: persistedUsers };
+      if (persistedCount < 3) return { marketplaceFlags: nextFlags } as any;
+      return {
+        marketplaceFlags: nextFlags,
+        marketplaceItems: state.marketplaceItems.filter((item) => item.id !== itemId),
+        myListings: state.myListings.filter((item) => item.id !== itemId),
+      } as any;
+    });
+    return persistedCount;
+  },
 
   createMarketplaceItem: async ({ title, description, price, imageUris = [], sellerPhone }: { title: string; description: string; price: number; imageUris?: string[]; sellerPhone: string }) => {
     const currentUser = get().currentUser;

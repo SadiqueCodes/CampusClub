@@ -8,7 +8,7 @@ import { MarketplaceItem } from '../types';
 
 export const MarketplaceScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { marketplaceItems, currentUser } = useStore();
+  const { marketplaceItems, currentUser, marketplaceFlags } = useStore();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
   const formatPrice = (value: number) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
@@ -18,22 +18,29 @@ export const MarketplaceScreen: React.FC = () => {
       filter === 'mine'
         ? marketplaceItems.filter((item) => item.sellerId === currentUser?.id && item.status === 'active')
         : marketplaceItems.filter((item) => item.status === 'active');
+    const visible = base.filter((item) => (marketplaceFlags[item.id] || []).length < 3);
 
-    if (!query.trim()) return base;
+    if (!query.trim()) return visible;
     const term = query.trim().toLowerCase();
-    return base.filter(
+    return visible.filter(
       (item) =>
         item.title.toLowerCase().includes(term) ||
         item.description.toLowerCase().includes(term) ||
         item.sellerName.toLowerCase().includes(term)
     );
-  }, [marketplaceItems, query, filter, currentUser?.id]);
+  }, [marketplaceItems, marketplaceFlags, query, filter, currentUser?.id]);
 
   const renderItem = ({ item }: { item: MarketplaceItem }) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate('MarketplaceDetail', { itemId: item.id })}
     >
+      {(marketplaceFlags[item.id] || []).length > 0 && (
+        <View style={styles.flagBadge}>
+          <Ionicons name="flag" size={10} color="#fff" />
+          <Text style={styles.flagBadgeText}>{(marketplaceFlags[item.id] || []).length}</Text>
+        </View>
+      )}
       {item.images?.length ? (
         <Image source={{ uri: item.images[0] }} style={styles.cardImage} />
       ) : (
@@ -191,6 +198,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#F3F4F6',
     shadowColor: '#000',
@@ -232,5 +240,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#B06579',
+  },
+  flagBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  flagBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

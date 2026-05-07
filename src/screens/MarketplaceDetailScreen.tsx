@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Linking, Modal } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -8,8 +8,15 @@ export const MarketplaceDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { itemId } = route.params;
-  const { marketplaceItems, currentUser, closeMarketplaceItem } = useStore();
+  const { marketplaceItems, currentUser, closeMarketplaceItem, marketplaceFlags, flagMarketplaceItem } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [closeConfirmVisible, setCloseConfirmVisible] = useState(false);
+  const [reportPopup, setReportPopup] = useState<{ visible: boolean; title: string; message: string; shouldGoBack: boolean }>({
+    visible: false,
+    title: '',
+    message: '',
+    shouldGoBack: false,
+  });
 
   const item = marketplaceItems.find((i) => i.id === itemId);
   const formatPrice = (value: number) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
@@ -23,6 +30,8 @@ export const MarketplaceDetailScreen: React.FC = () => {
   }
 
   const isOwnListing = currentUser?.id === item.sellerId;
+  const flagCount = (marketplaceFlags[item.id] || []).length;
+  const hasFlagged = !!(currentUser?.id && (marketplaceFlags[item.id] || []).includes(currentUser.id));
 
   const handleBuy = () => {
     if (item.status !== 'active') {
@@ -45,24 +54,48 @@ export const MarketplaceDetailScreen: React.FC = () => {
       Alert.alert('Already closed', 'This listing is already marked as closed.');
       return;
     }
-    Alert.alert('Close listing', 'Mark this listing as closed?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Close',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsSubmitting(true);
-            await closeMarketplaceItem(item.id);
-            navigation.goBack();
-          } catch (e: any) {
-            Alert.alert('Failed', e?.message || 'Could not close listing right now.');
-          } finally {
-            setIsSubmitting(false);
-          }
-        },
-      },
-    ]);
+    setCloseConfirmVisible(true);
+  };
+
+  const handleConfirmClose = async () => {
+    try {
+      setIsSubmitting(true);
+      await closeMarketplaceItem(item.id);
+      setCloseConfirmVisible(false);
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert('Failed', e?.message || 'Could not close listing right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFlagItem = async () => {
+    if (!currentUser?.id) return;
+    if (isOwnListing) return;
+    if (hasFlagged) return;
+    let nextCount = 0;
+    try {
+      nextCount = await flagMarketplaceItem(item.id, currentUser.id);
+    } catch (e: any) {
+      Alert.alert('Report failed', e?.message || 'Could not save report right now.');
+      return;
+    }
+    if (nextCount >= 3) {
+      setReportPopup({
+        visible: true,
+        title: 'Item Removed',
+        message: 'This item was removed after multiple scam reports.',
+        shouldGoBack: true,
+      });
+    } else {
+      setReportPopup({
+        visible: true,
+        title: 'Report Submitted',
+        message: `Thanks. Reports: ${nextCount}/3`,
+        shouldGoBack: false,
+      });
+    }
   };
 
   return (
@@ -92,6 +125,19 @@ export const MarketplaceDetailScreen: React.FC = () => {
           <Text style={styles.priceValue}>{formatPrice(item.price)}</Text>
         </View>
       </View>
+
+      {!isOwnListing && (
+        <TouchableOpacity
+          style={[styles.flagButton, hasFlagged && styles.flagButtonDisabled]}
+          onPress={handleFlagItem}
+          disabled={hasFlagged}
+        >
+          <Ionicons name="flag-outline" size={16} color={hasFlagged ? '#9CA3AF' : '#DC2626'} />
+          <Text style={[styles.flagButtonText, hasFlagged && styles.flagButtonTextDisabled]}>
+            {hasFlagged ? `Reported (${flagCount}/3)` : `Report scam (${flagCount}/3)`}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>About this item</Text>
@@ -136,6 +182,69 @@ export const MarketplaceDetailScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+      <Modal
+        transparent
+        visible={reportPopup.visible}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setReportPopup((prev) => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+            <View style={styles.popupIconWrap}>
+              <Ionicons name="flag" size={20} color="#fff" />
+            </View>
+            <Text style={styles.popupTitle}>{reportPopup.title}</Text>
+            <Text style={styles.popupMessage}>{reportPopup.message}</Text>
+            <TouchableOpacity
+              style={styles.popupButton}
+              onPress={() => {
+                const shouldGoBack = reportPopup.shouldGoBack;
+                setReportPopup((prev) => ({ ...prev, visible: false }));
+                if (shouldGoBack) navigation.goBack();
+              }}
+            >
+              <Text style={styles.popupButtonText}>Okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={closeConfirmVisible}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => !isSubmitting && setCloseConfirmVisible(false)}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupCard}>
+            <View style={styles.popupIconWrap}>
+              <Ionicons name="lock-closed" size={20} color="#fff" />
+            </View>
+            <Text style={styles.popupTitle}>Close Listing?</Text>
+            <Text style={styles.popupMessage}>
+              This will mark your listing as closed and hide contact actions for buyers.
+            </Text>
+            <View style={styles.popupActionsRow}>
+              <TouchableOpacity
+                style={[styles.popupButtonSecondary, isSubmitting && styles.actionDisabled]}
+                onPress={() => setCloseConfirmVisible(false)}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.popupButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.popupButton, isSubmitting && styles.actionDisabled]}
+                onPress={handleConfirmClose}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.popupButtonText}>{isSubmitting ? 'Closing...' : 'Close'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -241,6 +350,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#B06579',
   },
+  flagButton: {
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  flagButtonDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  flagButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B91C1C',
+  },
+  flagButtonTextDisabled: {
+    color: '#9CA3AF',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -340,5 +474,86 @@ const styles = StyleSheet.create({
   },
   actionDisabled: {
     opacity: 0.55,
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  popupCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F5D8E2',
+    shadowColor: '#E372A1',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 7,
+  },
+  popupIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#E372A1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  popupMessage: {
+    fontSize: 14,
+    color: '#4B5563',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  popupButton: {
+    minWidth: 120,
+    borderRadius: 12,
+    backgroundColor: '#E372A1',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popupButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  popupActionsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  popupButtonSecondary: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F5D8E2',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popupButtonSecondaryText: {
+    color: '#B06579',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
